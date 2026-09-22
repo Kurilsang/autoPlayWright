@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>Agent Chat Fixture</title>
+<style>
+  body { font-family: sans-serif; max-width: 720px; margin: 40px auto; }
+  #chat-messages { list-style: none; padding: 0; min-height: 200px; }
+  #chat-messages li { margin: 8px 0; padding: 8px 12px; border-radius: 8px; }
+  .user { background: #dcefff; }
+  .assistant { background: #f0f0f0; }
+</style>
+</head>
+<body>
+  <h1>Agent 会话夹具站点</h1>
+  <button data-testid="new-chat">新会话</button>
+  <ul data-testid="chat-messages" id="chat-messages"></ul>
+  <span data-testid="chat-streaming" id="chat-streaming" hidden>生成中…</span>
+  <div>
+    <textarea data-testid="chat-input" id="chat-input" placeholder="输入消息"></textarea>
+    <button data-testid="chat-send" id="chat-send">发送</button>
+  </div>
+  <script>
+    const input = document.getElementById('chat-input');
+    const send = document.getElementById('chat-send');
+    const list = document.getElementById('chat-messages');
+    const streaming = document.getElementById('chat-streaming');
+    document.querySelector('[data-testid="new-chat"]').addEventListener('click', () => {
+      list.innerHTML = '';
+    });
+    function add(role, text) {
+      const li = document.createElement('li');
+      li.className = role;
+      li.textContent = text;
+      list.appendChild(li);
+      return li;
+    }
+    send.addEventListener('click', () => {
+      const text = input.value.trim();
+      if (!text) return;
+      add('user', text);
+      input.value = '';
+      streaming.hidden = false;
+      send.disabled = true;
+      const bubble = add('assistant', '');
+      const reply = '收到：' + text + ' —— 这是夹具回复。';
+      let i = 0;
+      const timer = setInterval(() => {
+        bubble.textContent = reply.slice(0, ++i);
+        if (i >= reply.length) {
+          clearInterval(timer);
+          streaming.hidden = true;
+          send.disabled = false;
+        }
+      }, 20);
+    });
+  </script>
+</body>
+</html>

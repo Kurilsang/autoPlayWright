@@ -103,7 +103,14 @@ def pytest_sessionfinish(session, exitstatus):
     rt = session.config.stash.get(_RUNTIME_KEY, None)
     if rt is not None:
         rt.driver.stop()
-        rt.reporter.write_summary()
+        summary = rt.reporter.write_summary()
+        if summary is not None:
+            try:
+                from apw.reporter.html_report import render_html
+
+                print(f"\n[apw] HTML 报告: {render_html(summary.parent)}")
+            except Exception as exc:  # noqa: BLE001 - 渲染失败不影响测试结果
+                print(f"\n[apw] HTML 报告渲染失败: {exc}")
 
 
 # ---------- fixtures（框架自测与 flow 项共用运行时） ----------

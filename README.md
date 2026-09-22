@@ -49,6 +49,9 @@ steps:
 | 页面动作 | `src/apw/pages/`（Page Object，平台无关） |
 | 环境配置 | `configs/envs/<env>.yaml`（`--apw-env` 选择） |
 | JSON 报告 | `reports/<run_id>/<flow_id>.json` + `run-summary.json` |
+| HTML 报告 | `reports/<run_id>/report.html`（会话结束自动渲染，单文件、零依赖；也可 `python -m apw.reporter.html_report reports/<run_id>` 重渲染） |
+
+Allure 集成（可选）：默认无需 Allure 工具链；需要 Allure 平台消费时加 `--alluredir=allure-results`，用 Allure CLI/平台读取结果数据。
 
 ## 常用命令
 

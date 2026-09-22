@@ -15,3 +15,5 @@ build/
 *.egg-info/
 configs/secrets.local.yaml
 configs/auth-state.json
+
+pytest_out.txt

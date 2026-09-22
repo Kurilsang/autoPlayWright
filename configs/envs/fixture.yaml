@@ -1,0 +1,7 @@
+# 本地夹具站点：无登录，驱动框架自测与示例链路。
+base_url: tests/fixture_site/index.html
+driver:
+  mode: web
+  headless: true
+auth:
+  type: none

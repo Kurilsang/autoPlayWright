@@ -1,0 +1,8 @@
+# 真实测试环境模板（T01 spike 落地后补全，当前留空）。
+base_url: ""            # TODO(T01): 测试环境地址
+driver:
+  mode: web             # electron 模式待 T03
+  headless: true
+auth:
+  type: storage_state   # TODO(T01): 登录方案留空（SSO / 账号密码 / state_file 产出方式）
+  state_file: ""

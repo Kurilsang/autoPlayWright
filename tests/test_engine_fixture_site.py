@@ -89,6 +89,30 @@ class TestFailurePath:
         assert "ghost" in result.events[-1].error
 
 
+class TestStepContext:
+    def test_step_cm_factory_receives_titles(self, runner):
+        titles: list[str] = []
+
+        from contextlib import contextmanager
+
+        @contextmanager
+        def factory(title: str):
+            titles.append(title)
+            yield
+
+        runner.step_cm_factory = factory
+        spec = load_flow(Path("flows/example_chat.yaml"))
+        result = runner.run(spec)
+        assert result.status == "passed"
+        assert titles == [
+            "do: agent_chat.new_session",
+            "do: agent_chat.send_message",
+            "do: agent_chat.wait_reply_done",
+            "assert: visible message_list",
+            "assert: text_contains message_list",
+        ]
+
+
 class TestPrepare:
     def test_prepare_called_once_per_flow(self, runner):
         original = runner.prepare

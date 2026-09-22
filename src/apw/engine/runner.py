@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
+from contextlib import AbstractContextManager, nullcontext
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -26,7 +27,10 @@ def _elapsed_ms(t0: float) -> int:
 
 
 class FlowRunner:
-    """prepare: 每条 flow 开始前的回调（pytest 插件用它导航到 base_url）。"""
+    """prepare: 每条 flow 开始前的回调（pytest 插件用它导航到 base_url）。
+
+    step_cm_factory: 可选的步骤上下文工厂（如 allure.step），引擎自身不感知 Allure。
+    """
 
     def __init__(
         self,
@@ -37,6 +41,7 @@ class FlowRunner:
         reporter=None,
         prepare: Callable[[], None] | None = None,
         screenshot_dir: str | Path | None = None,
+        step_cm_factory: Callable[[str], AbstractContextManager] | None = None,
     ) -> None:
         self.page = page
         self.repo = repo
@@ -44,6 +49,7 @@ class FlowRunner:
         self.reporter = reporter
         self.prepare = prepare
         self.screenshot_dir = Path(screenshot_dir) if screenshot_dir else None
+        self.step_cm_factory = step_cm_factory
 
     def run(self, spec: FlowSpec) -> FlowResult:
         t0 = time.perf_counter()
@@ -69,22 +75,27 @@ class FlowRunner:
 
     def _run_step(self, flow_id: str, index: int, step) -> StepEvent:
         t0 = time.perf_counter()
-        common = {"flow_id": flow_id, "index": index}
+        common = {"flow_id": flow_id, "index": index, "kind": step.kind}
 
         if isinstance(step, JudgeStep):
             note = step.judge.get("note") or "LLM-as-Judge 预留（待接入）"
             return StepEvent(
-                kind="judge", detail=str(note), status="planned",
+                detail=str(note), status="planned",
                 duration_ms=_elapsed_ms(t0), **common,
             )
 
+        if isinstance(step, DoStep):
+            title = f"do: {step.do.page}.{step.do.action}"
+        else:
+            title = f"assert: {step.assert_.type} {step.assert_.target}"
+
         try:
-            if isinstance(step, DoStep):
-                detail = self._exec_do(step.do)
-            else:
-                detail = self._exec_assert(step.assert_)
+            with self._step_context(title):
+                if isinstance(step, DoStep):
+                    detail = self._exec_do(step.do)
+                else:
+                    detail = self._exec_assert(step.assert_)
             return StepEvent(
-                kind="do" if isinstance(step, DoStep) else "assert",
                 detail=detail,
                 status="passed",
                 duration_ms=_elapsed_ms(t0),
@@ -92,7 +103,6 @@ class FlowRunner:
             )
         except Exception as exc:  # noqa: BLE001 - 单步失败需转为事件而非中断引擎
             return StepEvent(
-                kind="do" if isinstance(step, DoStep) else "assert",
                 detail="",
                 status="failed",
                 error=f"{type(exc).__name__}: {exc}",
@@ -100,6 +110,9 @@ class FlowRunner:
                 duration_ms=_elapsed_ms(t0),
                 **common,
             )
+
+    def _step_context(self, title: str) -> AbstractContextManager:
+        return self.step_cm_factory(title) if self.step_cm_factory else nullcontext()
 
     def _exec_do(self, action) -> str:
         obj = self.pages.create(action.page, page=self.page, repo=self.repo)

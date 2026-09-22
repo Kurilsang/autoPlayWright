@@ -7,10 +7,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING
 
 import pytest
 from pytest import StashKey
+
+if TYPE_CHECKING:
+    from apw.config import EnvConfig
+    from apw.driver.app_driver import AppDriver
+    from apw.engine.registry import PageRegistry
+    from apw.locators.repo import LocatorRepo
+    from apw.reporter.json_report import JsonReporter
 
 
 def pytest_addoption(parser):
@@ -32,11 +39,11 @@ def pytest_addoption(parser):
 
 @dataclass
 class ApwRuntime:
-    env: Any
-    driver: Any
-    repo: Any
-    pages: Any
-    reporter: Any
+    env: EnvConfig
+    driver: AppDriver
+    repo: LocatorRepo
+    pages: PageRegistry
+    reporter: JsonReporter
 
 
 _RUNTIME_KEY: StashKey[ApwRuntime | None] = StashKey()
@@ -78,7 +85,18 @@ def build_runner(config):
         reporter=rt.reporter,
         prepare=rt.driver.goto_base,
         screenshot_dir=rt.reporter.out_dir,
+        step_cm_factory=_allure_step_factory(config),
     )
+
+
+def _allure_step_factory(config):
+    """Allure 步骤划分接入点：引擎吐标题，Allure 画层级，二者互不依赖。"""
+    try:
+        import allure
+
+        return allure.step
+    except ImportError:
+        return None
 
 
 def pytest_sessionfinish(session, exitstatus):
@@ -159,6 +177,9 @@ class ApwFlowItem(pytest.Item):
         self.result = None
         for platform in spec.meta.platforms:
             self.add_marker(platform)
+        for tag in spec.meta.tags:
+            self.config.addinivalue_line("markers", f"{tag}: flow tag")
+            self.add_marker(tag)
 
     def runtest(self):
         rt = get_runtime(self.config)

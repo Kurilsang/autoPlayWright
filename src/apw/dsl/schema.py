@@ -82,4 +82,5 @@ class FlowSpec(BaseModel):
 
     meta: FlowMeta
     steps: list[Step] = Field(default_factory=list)
+    # TODO(T04): vars 在步骤 args/钩子中以 {{name}} 占位引用
     vars: dict[str, Any] = Field(default_factory=dict)

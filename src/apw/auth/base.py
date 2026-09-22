@@ -4,12 +4,9 @@ T01 spike 落地前，storage_state 方案为留空占位；本地夹具站点�
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Protocol
+from typing import Protocol
 
 from apw.config import AuthConfig
-
-if TYPE_CHECKING:
-    pass
 
 
 class AuthProvider(Protocol):

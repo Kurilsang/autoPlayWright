@@ -1,0 +1,18 @@
+# AI 生成草稿（T07 预演）：爬取真实页面结构后生成，经人工审核入库。
+# 断言全部为确定性内容（组件渲染/用户输入回显），不断言 LLM 措辞。
+meta:
+  id: aml-chat-smoke
+  name: Aml Agent 冒烟：新建对话并发送消息
+  platforms: [web]
+  envs: [test]
+  tags: [P0, smoke, ai-draft]
+  owner: qa
+steps:
+  - do: { page: aml_chat, action: dismiss_onboarding, args: {} }
+  - do: { page: aml_chat, action: new_session, args: {} }
+  - do: { page: aml_chat, action: send_message, args: { text: "你好" } }
+  - do: { page: aml_chat, action: wait_reply_done, args: { timeout_ms: 120000 } }
+  - assert: { type: visible, page: aml_chat, target: user_message }
+  - assert: { type: text_contains, page: aml_chat, target: user_message, expected: "你好" }
+  - assert: { type: visible, page: aml_chat, target: assistant_reply }
+  - judge: { note: "v1 预留：回复内容质量由 LLM-as-Judge 判定" }

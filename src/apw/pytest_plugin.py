@@ -193,6 +193,8 @@ class ApwFlowItem(pytest.Item):
         active = "desktop" if rt.env.driver.mode == "electron" else "web"
         if active not in self.spec.meta.platforms:
             pytest.skip(f"平台不匹配：flow 需要 {self.spec.meta.platforms}，当前 {active}")
+        if self.spec.meta.envs and rt.env.name not in self.spec.meta.envs:
+            pytest.skip(f"环境不匹配：flow 限定 {self.spec.meta.envs}，当前 {rt.env.name}")
 
         runner = build_runner(self.config)
         self.result = runner.run(self.spec)

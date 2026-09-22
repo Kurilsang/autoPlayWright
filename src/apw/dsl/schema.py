@@ -15,6 +15,7 @@ class FlowMeta(BaseModel):
     id: str
     name: str
     platforms: list[Platform] = ["web"]
+    envs: list[str] = []  # 空表示所有环境可跑；指定则仅在这些环境执行
     tags: list[str] = Field(default_factory=list)
     owner: str = ""
 

@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field, TypeAdapter
 if TYPE_CHECKING:
     from playwright.sync_api import Locator, Page
 
-SelectorBy = Literal["testid", "role", "label", "text", "css", "xpath"]
+SelectorBy = Literal["testid", "role", "label", "placeholder", "text", "css", "xpath"]
 
 
 class Selector(BaseModel):
@@ -53,6 +53,8 @@ def build_locator(page: Page, sel: Selector) -> Locator:
         return page.get_by_role(sel.value, name=sel.name or None, exact=sel.exact)
     if sel.by == "label":
         return page.get_by_label(sel.value, exact=sel.exact)
+    if sel.by == "placeholder":
+        return page.get_by_placeholder(sel.value, exact=sel.exact)
     if sel.by == "text":
         return page.get_by_text(sel.value, exact=sel.exact)
     if sel.by == "css":

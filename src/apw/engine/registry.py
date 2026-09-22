@@ -36,7 +36,9 @@ class PageRegistry:
 
 def default_registry() -> PageRegistry:
     from apw.pages.agent_chat import AgentChatPage
+    from apw.pages.aml_chat import AmlChatPage
 
     registry = PageRegistry()
     registry.register("agent_chat", AgentChatPage)
+    registry.register("aml_chat", AmlChatPage)
     return registry

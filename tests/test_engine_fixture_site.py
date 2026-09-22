@@ -55,7 +55,8 @@ class TestFailurePath:
                 1,
             ),
             parse_step(
-                {"assert": {"type": "text_contains", "target": "message_list",
+                {"assert": {"type": "text_contains", "page": "agent_chat",
+                            "target": "message_list",
                             "expected": "绝不存在的文本", "timeout_ms": 1500}},
                 2,
             ),

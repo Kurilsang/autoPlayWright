@@ -2,12 +2,13 @@ meta:
   id: example-chat
   name: 示例：发送消息并等待回复
   platforms: [web]
+  envs: [fixture]
   tags: [P0, example]
   owner: qa
 steps:
   - do: { page: agent_chat, action: new_session, args: {} }
   - do: { page: agent_chat, action: send_message, args: { text: "你好，夹具" } }
   - do: { page: agent_chat, action: wait_reply_done, args: { timeout_ms: 15000 } }
-  - assert: { type: visible, target: message_list }
-  - assert: { type: text_contains, target: message_list, expected: "你好，夹具" }
+  - assert: { type: visible, page: agent_chat, target: message_list }
+  - assert: { type: text_contains, page: agent_chat, target: message_list, expected: "你好，夹具" }
   - judge: { note: "v1 预留：LLM-as-Judge 后续接入" }

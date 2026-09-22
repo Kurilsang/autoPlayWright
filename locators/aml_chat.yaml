@@ -1,0 +1,25 @@
+# Aml Agent 会话页（真实环境）。由 AI 爬取页面结构生成（T07 预演），人工审核入库。
+# 真实应用无 data-testid，候选优先使用稳定文案（placeholder/exact text）与结构类名。
+page: aml_chat
+locators:
+  - name: new_chat_button
+    source: ai
+    candidates:
+      - { by: text, value: 新建对话 }
+  - name: message_input
+    source: ai
+    candidates:
+      - { by: placeholder, value: "输入消息，按Enter发送，Shift+Enter换行" }
+      - { by: css, value: "textarea" }
+  - name: stop_button
+    source: ai
+    candidates:
+      - { by: text, value: 停止 }
+  - name: user_message
+    source: ai
+    candidates:
+      - { by: css, value: "div.text-white.whitespace-pre-wrap" }
+  - name: assistant_reply
+    source: ai
+    candidates:
+      - { by: css, value: "div.markdown-prose" }

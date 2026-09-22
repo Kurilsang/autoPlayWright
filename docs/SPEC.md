@@ -1,7 +1,8 @@
 # SPEC：内部 Agent 产品 UI 自动化测试框架（autoPlayWright）
 
-> 状态：ready-for-agent（待同步至 issue tracker）
+> 状态：已采纳并部分实现（M0/票02 于 2026-09-22 交付；issue tracker 同步仍待定）
 > 来源：2026-09 需求探讨（grilling 决策记录见文末附录）
+> 当前进度以 `AGENTS.md` 与 `.scratch/autoPlayWright/issues/` 为准，本文件是规格与决策记录。
 
 ## Problem Statement
 

@@ -13,10 +13,12 @@ python -m venv .venv
 .venv\Scripts\pip install -e ".[dev]"
 .venv\Scripts\playwright install chromium
 
-# 跑全部框架自测 + flows/ 下的业务链路
-.venv\Scripts\pytest
-# 只跑业务链路（默认 fixture 本地夹具环境）
+# 框架自测（不触发浏览器）
+.venv\Scripts\pytest tests
+# 业务链路（默认 fixture 本地夹具环境）
 .venv\Scripts\pytest flows
+# 全部
+.venv\Scripts\pytest tests flows
 ```
 
 ## 写一条用例 = 写一个 YAML

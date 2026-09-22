@@ -35,9 +35,10 @@ Python 3.11+ / Playwright（同步 API）/ pytest 9（pytest11 插件入口）/ 
 - 只断言确定性内容（组件/状态/结构），不断言 LLM 措辞
 - 引擎不 import pytest/allure；报告与 pytest 只是引擎下游消费者
 - 页面元素一律走定位器仓库，禁止散落裸 selector
+- **凭据永不入库**：本地 `configs/secrets.local.yaml`（gitignored）或 CI 环境变量 `APW_USERNAME`/`APW_PASSWORD`
 
 ## 当前状态（2026-09-22）
 
-- 票 02（DSL→pytest→JSON tracer bullet）已交付；25 测试全绿
-- 留空待输入：登录方案（T01，SSO/账号）、Electron 安装包 launch（T03，CDP attach 可用）
-- 下一步：T01（当前唯一前沿票）→ T03/T04/T05/T06 并行 → T07/T08
+- 票 01（表单登录 + 会话复用，真实环境 `--apw-env test` 冒烟通过）、票 02（DSL tracer bullet）已交付；28 测试全绿
+- 留空待输入：仅 Electron 安装包 launch（T03，CDP attach 可用）
+- 下一步：T03/T04/T05/T06 四线并行 → T07/T08

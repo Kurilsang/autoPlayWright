@@ -1,8 +1,14 @@
-# 真实测试环境模板（T01 spike 落地后补全，当前留空）。
-base_url: ""            # TODO(T01): 测试环境地址
+# 真实测试环境（Aml Agent）。凭据不入库：secrets.local.yaml（本地）或环境变量（CI）。
+base_url: https://aml-agent.amlogic.com/chat
 driver:
-  mode: web             # electron 模式待 T03
+  mode: web
   headless: true
 auth:
-  type: storage_state   # TODO(T01): 登录方案留空（SSO / 账号密码 / state_file 产出方式）
-  state_file: ""
+  type: form
+  login_url: https://aml-agent.amlogic.com/login
+  login_path_hint: /login
+  username_selector: "#username"
+  password_selector: "#password"
+  submit_selector: 'button[type="submit"]'
+  state_file: configs/auth-state.json   # 登录成功后回写，后续运行复用会话
+  secrets_file: configs/secrets.local.yaml

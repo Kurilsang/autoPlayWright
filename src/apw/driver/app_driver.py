@@ -12,11 +12,14 @@ from apw.config import EnvConfig, resolve_base_url
 if TYPE_CHECKING:
     from playwright.sync_api import Browser, BrowserContext, Page, Playwright
 
+    from apw.auth.base import AuthProvider
+
 
 class AppDriver:
     def __init__(self, env: EnvConfig, root: str = ".") -> None:
         self.env = env
         self.root = root
+        self._auth: AuthProvider | None = None
         self._pw: Playwright | None = None
         self._browser: Browser | None = None
         self._context: BrowserContext | None = None
@@ -32,8 +35,10 @@ class AppDriver:
             pages = self._context.pages
             self._page = pages[0] if pages else self._context.new_page()
         else:
+            self._auth = build_auth(self.env.auth)
             self._context = self._start_web()
             self._page = self._context.new_page()
+            self._auth.ensure(self._page, resolve_base_url(self.env, self.root))
         return self
 
     def stop(self) -> None:
@@ -55,8 +60,7 @@ class AppDriver:
         if self.env.driver.channel:
             launch_kwargs["channel"] = self.env.driver.channel
         self._browser = self._pw.chromium.launch(**launch_kwargs)
-        auth = build_auth(self.env.auth)
-        return self._browser.new_context(**auth.context_kwargs())
+        return self._browser.new_context(**self._auth.context_kwargs())
 
     def _start_electron(self) -> BrowserContext:
         assert self._pw is not None

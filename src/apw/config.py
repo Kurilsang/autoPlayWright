@@ -9,10 +9,25 @@ from pydantic import BaseModel, Field
 
 
 class AuthConfig(BaseModel):
-    """认证配置。storage_state 为 T01 spike 的留空接缝。"""
+    """认证配置。
 
-    type: Literal["none", "storage_state"] = "none"
-    state_file: str = ""
+    - none: 无登录（本地夹具站点）
+    - storage_state: 直接复用已有 storage_state 文件
+    - form: 账号密码表单登录（T01）。凭据解析顺序：
+      显式配置（不推荐入库）→ 环境变量 APW_USERNAME/APW_PASSWORD → secrets_file
+    """
+
+    type: Literal["none", "storage_state", "form"] = "none"
+    state_file: str = ""  # storage_state 路径；form 模式下登录成功后回写复用
+    # ---- form 专属 ----
+    login_url: str = ""
+    login_path_hint: str = "/login"  # URL 含此片段视为未登录
+    username_selector: str = "#username"
+    password_selector: str = "#password"
+    submit_selector: str = 'button[type="submit"]'
+    username: str = ""
+    password: str = ""
+    secrets_file: str = ""
 
 
 class ElectronConfig(BaseModel):

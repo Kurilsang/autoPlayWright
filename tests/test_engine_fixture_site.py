@@ -27,7 +27,7 @@ class TestExampleFlow:
         spec = load_flow(Path("flows/example_chat.yaml"))
         result = runner.run(spec)
         assert result.status == "passed", result.model_dump_json(indent=2)
-        assert [e.status for e in result.events] == ["passed"] * 5 + ["planned"]
+        assert [e.status for e in result.events] == ["passed"] * 6 + ["planned"]
         judge_event = result.events[-1]
         assert judge_event.kind == "judge"
 
@@ -109,9 +109,75 @@ class TestStepContext:
             "do: agent_chat.new_session",
             "do: agent_chat.send_message",
             "do: agent_chat.wait_reply_done",
+            "do: agent_chat.capture_context",
             "assert: visible message_list",
             "assert: text_contains message_list",
         ]
+
+
+class TestEvidenceCapture:
+    """动作返回的结构化采集数据（对话上下文）进事件证据，供报告核对输入输出。"""
+
+    def test_capture_context_records_turns(self, runner):
+        spec = load_flow(Path("flows/example_chat.yaml"))
+        result = runner.run(spec)
+        assert result.status == "passed"
+        capture = next(
+            e for e in result.events if e.detail.endswith("capture_context")
+        )
+        assert capture.evidence["turn_count"] == 2
+        turns = capture.evidence["turns"]
+        assert [t["role"] for t in turns] == ["user", "assistant"]
+        assert turns[0]["text"] == "你好，夹具"
+        assert turns[1]["answer"]  # 回答正文完整采集
+        assert capture.evidence["url"] and capture.evidence["captured_at"]
+
+    def test_non_capture_action_has_empty_evidence(self, runner):
+        spec = load_flow(Path("flows/example_chat.yaml"))
+        result = runner.run(spec)
+        send = next(e for e in result.events if e.detail.endswith("send_message"))
+        assert send.evidence == {}
+
+
+class TestEvidenceOnFailure:
+    """失败动作携带的归因证据（EvidenceError.evidence）进失败事件。"""
+
+    def test_failed_action_records_evidence_and_screenshot(
+        self, apw_driver, apw_repo, tmp_path
+    ):
+        from apw.engine.registry import PageRegistry
+        from apw.engine.runner import FlowRunner
+        from apw.pages.base import EvidenceError
+
+        class HangPage:
+            def __init__(self, *, page, repo):
+                self.page = page
+                self.repo = repo
+
+            def explode(self):
+                raise EvidenceError(
+                    "完整回答未达成［归因: hang_loading］",
+                    {"classification": "hang_loading", "repro": {"url": "x"}},
+                )
+
+        registry = PageRegistry()
+        registry.register("hang", HangPage)
+        runner = FlowRunner(
+            page=apw_driver.page,
+            repo=apw_repo,
+            pages=registry,
+            screenshot_dir=tmp_path,
+        )
+        spec = FlowSpec(
+            meta=FlowMeta(id="neg4", name="负例4"),
+            steps=[parse_step({"do": {"page": "hang", "action": "explode"}}, 0)],
+        )
+        result = runner.run(spec)
+        event = result.events[-1]
+        assert event.status == "failed"
+        assert "hang_loading" in event.error
+        assert event.evidence["classification"] == "hang_loading"
+        assert event.screenshot and Path(event.screenshot).exists()
 
 
 class TestPrepare:

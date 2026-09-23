@@ -56,7 +56,10 @@ class AppDriver:
     # ---- 模式实现 ----
     def _start_web(self) -> BrowserContext:
         assert self._pw is not None
-        launch_kwargs: dict = {"headless": self.env.driver.headless}
+        launch_kwargs: dict = {
+            "headless": self.env.driver.headless,
+            "slow_mo": self.env.driver.slow_mo,
+        }
         if self.env.driver.channel:
             launch_kwargs["channel"] = self.env.driver.channel
         self._browser = self._pw.chromium.launch(**launch_kwargs)

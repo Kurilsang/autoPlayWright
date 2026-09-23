@@ -36,6 +36,7 @@ steps:
   - do: { page: agent_chat, action: new_session, args: {} }
   - do: { page: agent_chat, action: send_message, args: { text: "你好，夹具" } }
   - do: { page: agent_chat, action: wait_reply_done, args: { timeout_ms: 15000 } }
+  - do: { page: agent_chat, action: capture_context, args: {} }
   - assert: { type: visible, page: agent_chat, target: message_list }
   - assert: { type: text_contains, page: agent_chat, target: message_list, expected: "你好，夹具" }
   - judge: { note: "v1 预留：LLM-as-Judge 后续接入" }
@@ -51,7 +52,7 @@ steps:
 | 命名定位器 | `locators/<page>.yaml`（testid > role+name > placeholder/label > text > css/xpath 候选优先级） |
 | 页面动作 | `src/apw/pages/`（Page Object，平台无关） |
 | 环境配置 | `configs/envs/<env>.yaml`（`--apw-env` 选择） |
-| JSON 报告 | `reports/<run_id>/<flow_id>.json` + `run-summary.json` |
+| JSON 报告 | `reports/<run_id>/<flow_id>.json` + `run-summary.json`（含 `capture_context` 采集的完整对话上下文证据：用户输入 / 推理步骤 / 思考过程 / 最终答案） |
 | HTML 报告 | `reports/<run_id>/report.html`（会话结束自动渲染，单文件、零依赖；也可 `python -m apw.reporter.html_report reports/<run_id>` 重渲染） |
 
 Allure 集成（可选）：默认无需 Allure 工具链；需要 Allure 平台消费时加 `--alluredir=allure-results`，用 Allure CLI/平台读取结果数据。
@@ -61,6 +62,10 @@ Allure 集成（可选）：默认无需 Allure 工具链；需要 Allure 平台
 ```powershell
 pytest flows --apw-env fixture -k example   # 按环境/关键字过滤
 pytest flows --apw-env test                 # 真实测试环境（表单登录自动完成）
+
+# 调试模式：窗口可见 + 放慢动作，实时观察执行过程
+pytest flows --apw-env test --apw-headed --apw-slowmo 250
+# 或直接双击 / 运行 run_debug.bat（等价于上面这条，可追加 pytest 参数）
 ```
 
 ## 当前留空（接缝已就位，等输入）

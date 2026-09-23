@@ -92,11 +92,12 @@ class FlowRunner:
         try:
             with self._step_context(title):
                 if isinstance(step, DoStep):
-                    detail = self._exec_do(step.do)
+                    detail, evidence = self._exec_do(step.do)
                 else:
-                    detail = self._exec_assert(step.assert_)
+                    detail, evidence = self._exec_assert(step.assert_), {}
             return StepEvent(
                 detail=detail,
+                evidence=evidence,
                 status="passed",
                 duration_ms=_elapsed_ms(t0),
                 **common,
@@ -106,6 +107,7 @@ class FlowRunner:
                 detail="",
                 status="failed",
                 error=f"{type(exc).__name__}: {exc}",
+                evidence=getattr(exc, "evidence", None) or {},
                 screenshot=self._screenshot(flow_id, index),
                 duration_ms=_elapsed_ms(t0),
                 **common,
@@ -114,13 +116,16 @@ class FlowRunner:
     def _step_context(self, title: str) -> AbstractContextManager:
         return self.step_cm_factory(title) if self.step_cm_factory else nullcontext()
 
-    def _exec_do(self, action) -> str:
+    def _exec_do(self, action) -> tuple[str, dict]:
         obj = self.pages.create(action.page, page=self.page, repo=self.repo)
+        obj.screenshot_dir = self.screenshot_dir  # 动作可产出截图证据（如冻结现场）
         fn = getattr(obj, action.action, None)
         if not callable(fn):
             raise AttributeError(f"页面 {action.page} 没有动作 {action.action!r}")
-        fn(**action.args)
-        return f"{action.page}.{action.action}"
+        captured = fn(**action.args)
+        # 约定：动作返回 dict 视为结构化采集数据（如对话上下文），进事件证据
+        evidence = captured if isinstance(captured, dict) else {}
+        return f"{action.page}.{action.action}", evidence
 
     def _exec_assert(self, assertion) -> str:
         page_name = assertion.page or self.pages.single()

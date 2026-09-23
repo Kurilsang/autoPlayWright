@@ -46,6 +46,10 @@ pre { background: #f6f8fa; border: 1px solid var(--line); border-radius: 6px;
       font-size: 12px; margin: 6px 0 0; }
 img.shot { max-width: 480px; border: 1px solid var(--line); border-radius: 6px;
            margin: 8px 0 0; display: block; }
+.ctx { margin: 8px 0 0; border: 1px dashed var(--line); border-radius: 6px;
+       padding: 8px 12px; }
+.ctx .role { font-size: 11px; color: var(--muted); font-weight: 600; margin: 8px 0 0; }
+.ctx .role:first-child { margin-top: 0; }
 """
 
 _TEMPLATE = """<!doctype html>
@@ -92,11 +96,59 @@ def _badge(status: str) -> tuple[str, str, str]:
     return icon, color, bg
 
 
+def _turn_text(turn: dict) -> str:
+    """把一轮对话规整为可读文本：用户输入 / 推理步骤 + 思考过程 + 最终答案。"""
+    if turn.get("role") == "user":
+        return str(turn.get("text", ""))
+    blocks = []
+    if turn.get("reasoning_steps"):
+        blocks.append(f"[推理步骤]\n{turn['reasoning_steps']}")
+    if turn.get("thinking"):
+        blocks.append(f"[思考过程]\n{turn['thinking']}")
+    blocks.append(f"[最终答案]\n{turn.get('final_answer') or turn.get('answer') or ''}")
+    return "\n\n".join(blocks)
+
+
+def _render_evidence(evidence: dict) -> str:
+    """渲染动作采集证据：对话上下文按轮展示、归因数据 JSON、冻结截图内嵌。"""
+    parts = []
+    turns = evidence.get("turns") or []
+    if turns:
+        parts.append(f'<div class="role">上下文采集 · {len(turns)} 轮</div>')
+        for turn in turns:
+            role = "用户输入" if turn.get("role") == "user" else "回答"
+            ts = turn.get("timestamp") or evidence.get("captured_at", "")
+            head = f"{role} · {ts}" if ts else role
+            parts.append(
+                f'<div class="role">{_esc(head)}</div><pre>{_esc(_turn_text(turn))}</pre>'
+            )
+    rest = {
+        k: v
+        for k, v in evidence.items()
+        if k not in {"turns", "screenshots", "url", "captured_at", "turn_count"}
+    }
+    if rest:
+        parts.append(
+            '<div class="role">归因与复现</div>'
+            f'<pre>{_esc(json.dumps(rest, ensure_ascii=False, indent=2))}</pre>'
+        )
+    if not parts:
+        parts.append(
+            f'<pre>{_esc(json.dumps(evidence, ensure_ascii=False, indent=2))}</pre>'
+        )
+    for shot in evidence.get("screenshots") or []:
+        name = Path(str(shot)).name
+        parts.append(f'<img class="shot" src="{_esc(name)}" alt="冻结截图 {_esc(name)}">')
+    return f'<div class="ctx">{"".join(parts)}</div>'
+
+
 def _render_row(event: dict) -> str:
     icon, color, bg = _badge(event.get("status", ""))
     extra = ""
+    if event.get("evidence"):
+        extra += _render_evidence(event["evidence"])
     if event.get("error"):
-        extra = f'<pre>{_esc(event["error"])}</pre>'
+        extra += f'<pre>{_esc(event["error"])}</pre>'
     if event.get("screenshot"):
         shot = Path(event["screenshot"])
         extra += (f'<img class="shot" src="{_esc(shot.name)}" '

@@ -1,6 +1,6 @@
 # SPEC：内部 Agent 产品 UI 自动化测试框架（autoPlayWright）
 
-> 状态：已采纳并部分实现（票 01 表单登录、票 02 tracer bullet 于 2026-09-22 交付；T07 人工预演完成；issue tracker 同步仍待定）
+> 状态：已采纳并部分实现（票 01 表单登录、票 02 tracer bullet 于 2026-09-22 交付；T07 预演产物已产品化，真实环境冒烟持续绿灯，2026-09-23；issue tracker 同步仍待定）
 > 来源：2026-09 需求探讨（grilling 决策记录见文末附录）
 > 当前进度以 `AGENTS.md` 与 `.scratch/autoPlayWright/issues/` 为准，本文件是规格与决策记录。
 
@@ -61,10 +61,10 @@ steps:
   - judge:  { ... }                  # v1 预留：校验通过但执行时标记 skip
 ```
 
-- `engine`：DSL 解释器。加载 → 校验 → 顺序执行 steps（通过 Page Object 与钩子注册表）→ 持续产出 StepEvent 事件流。内置"流式输出完成"等待策略（基于可配置的 UI 信号：发送/停止按钮状态等，加超时兜底）。
+- `engine`：DSL 解释器。加载 → 校验 → 顺序执行 steps（通过 Page Object 与钩子注册表）→ 持续产出 StepEvent 事件流。内置"完整回答"完成判定（实现演进 2026-09-23：六信号缺一不可——停止按钮消失、思考过程组件在场、最终答案标识在场、完成态操作行在场、文本稳定、历史加载占位清除；单信号会被推理期/半截渲染误判）。动作返回 dict 即作为结构化证据写入 StepEvent.evidence。
 - `crawler`（AI 生成侧）：Playwright 驱动的遍历器，产出页面快照 JSON（路由、语义化交互元素：role/name/testid/placeholder）+ 截图。生成器将快照 + 业务描述交给 LLM 产出 flow 草稿与定位器候选，输出为可评审的 diff。快照对比器支持重爬 diff，输出受影响的定位器/页面/链路影响清单。
 - `judge`：v1 仅定义接口形状（判定上下文入参 → 评分/结论/理由的结构化出参），不实现判定逻辑；引擎遇到 `judge` 步骤标记 skip 并写入报告。
-- `reporter`：StepEvent JSON 是第一公民——flow 级明细（每步的输入/实际输出/断言明细/耗时/截图引用）+ run 级汇总。人类层由内置 HTML 渲染器承担（会话结束自动产出 `report.html`，单文件零依赖）；Allure 为可选输出（`--alluredir` 产结果数据，flow=测试用例、step=allure step、JSON 与截图作附件）。
+- `reporter`：StepEvent JSON 是第一公民——flow 级明细（每步的输入/实际输出/断言明细/耗时/截图引用）+ run 级汇总。人类层由内置 HTML 渲染器承担（会话结束自动产出 `report.html`，单文件零依赖）；Allure 为可选输出（`--alluredir` 产结果数据，flow=测试用例、step=allure step、JSON 与截图作附件）。实现演进 2026-09-23：报告含完整对话上下文证据（`capture_context` 采集用户输入/推理步骤/思考过程/最终答案），人工核对输入输出与后续 LLM-as-Judge 共用这份数据。
 - `runner`/配置：pytest 自动收集 flows 目录并按 `platforms × tags` 参数化为测试项；环境配置（URL、账号、驱动模式）独立于用例。
 
 ### 执行与并发
@@ -73,6 +73,8 @@ steps:
 - 限流感知重试：429 类错误按退避策略重试，重试计入报告。
 - 会话隔离：每条 flow 执行时新建会话，用例间无数据依赖。
 - 失败时自动留存 Playwright trace、截图，路径写入 StepEvent。
+- 失败即取证，禁止自愈（实现决策 2026-09-23）：卡死/半截渲染等 UI 缺陷本身就是被测对象，测试判 fail 并冻结现场——EvidenceError 携带归因分类（hang_loading / streaming_stuck / reply_incomplete / content_unstable）、复现信息（操作序 + 会话 URL + 观察窗口）、1s 粒度信号时间线、冻结截图与半截上下文，进入失败事件的 evidence。自动重载/重试把偶发缺陷跑绿属于假通过，不做。
+- 调试模式：`--apw-headed`（窗口可见）+ `--apw-slowmo MS`（动作放慢）CLI 覆盖环境配置；`run_debug.bat` 一键包装。
 
 ### 技术栈
 
@@ -109,6 +111,8 @@ Python 3.11+、Playwright（同步 API）、pytest、pytest-xdist、allure-pytes
 - **限流是硬约束**：所有执行侧设计（并行度、重试、排队）以"后端 LLM 服务 3~5 并发即限流"为前提。
 - **风险与前置开放项**（进入 M0 前需确认）：
   - ~~登录方式~~ 已解决（2026-09-22）：Aml Agent 为账号密码表单登录，凭据走 `configs/secrets.local.yaml`（gitignored）/环境变量，storage_state 回写复用，见票 01。
+  - 环境事实（2026-09-23）：`aml-agent.amlogic.com` 为正式环境，**勿用于测试**；测试环境 `http://10.28.28.134:3000/`（免登录直达 /chat）。
+  - 已知产品缺陷（2026-09-23，待产品侧修复）：会话区「加载对话历史中」偶发卡死不返回（后端 API 同期正常，指向前端状态机）；复现线索：新建会话 → 确认 Agent 类型弹窗 → 随即发送首条消息，时机不定。测试遇到即判 fail 并按失败取证流程留现场。
   - Electron 可执行文件在 CI 上的获取方式（固定安装路径？构建产物下载？）与版本管理和 Playwright 兼容性。
   - 内部 LLM 网关用于草稿生成的选型与配额。
 - 里程碑建议：M0 骨架（驱动双模式 + BasePage + 引擎 + JSON/Allure 报告 + 1 条手写 flow 跑通）→ M1 核心链路覆盖（20~50 条）→ M2 AI 生成流水线（爬虫 + 草稿 + 评审流程）→ M3 快照 diff/影响分析 + Judge 接入。

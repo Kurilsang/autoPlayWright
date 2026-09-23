@@ -32,6 +32,19 @@ def pytest_addoption(parser):
     group.addoption(
         "--apw-reports-dir", default="reports", help="JSON 报告输出目录"
     )
+    group.addoption(
+        "--apw-headed",
+        action="store_true",
+        default=False,
+        help="调试模式：浏览器窗口可见（覆盖环境配置 headless=true）",
+    )
+    group.addoption(
+        "--apw-slowmo",
+        type=int,
+        default=0,
+        metavar="MS",
+        help="调试模式：每个动作间延迟毫秒数（默认 0，如 250），配合 --apw-headed 实时观察",
+    )
 
 
 # ---------- 运行时（惰性单例） ----------
@@ -61,6 +74,12 @@ def get_runtime(config) -> ApwRuntime:
     from apw.reporter.json_report import JsonReporter
 
     env = load_env(config.getoption("--apw-env"))
+    # 调试开关（CLI）覆盖环境配置
+    if config.getoption("--apw-headed"):
+        env.driver.headless = False
+    slow_mo = config.getoption("--apw-slowmo")
+    if slow_mo:
+        env.driver.slow_mo = slow_mo
     driver = AppDriver(env=env)
     driver.start()
     rt = ApwRuntime(

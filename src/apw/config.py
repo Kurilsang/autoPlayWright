@@ -42,6 +42,7 @@ class DriverConfig(BaseModel):
     mode: Literal["web", "electron"] = "web"
     channel: str = ""  # 例如 "msedge" 使用系统浏览器，空则用 Playwright 内置 chromium
     headless: bool = True
+    slow_mo: int = 0  # 每个 Playwright 动作间的延迟 ms，调试放慢用
     electron: ElectronConfig = Field(default_factory=ElectronConfig)
 
 

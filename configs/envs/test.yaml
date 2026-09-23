@@ -1,11 +1,11 @@
 # 真实测试环境（Aml Agent）。凭据不入库：secrets.local.yaml（本地）或环境变量（CI）。
-base_url: https://aml-agent.amlogic.com/chat
+base_url: http://10.28.28.134:3000/
 driver:
   mode: web
   headless: true
 auth:
   type: form
-  login_url: https://aml-agent.amlogic.com/login
+  login_url: http://10.28.28.134:3000/login
   login_path_hint: /login
   username_selector: "#username"
   password_selector: "#password"

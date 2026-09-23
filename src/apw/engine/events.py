@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -21,6 +21,7 @@ class StepEvent(BaseModel):
     started_at: str = Field(default_factory=_now)
     duration_ms: int = 0
     screenshot: str = ""
+    evidence: dict[str, Any] = Field(default_factory=dict)  # 动作返回的结构化采集数据
 
 
 class FlowResult(BaseModel):

@@ -8,11 +8,18 @@ meta:
   tags: [P0, smoke, ai-draft]
   owner: qa
 steps:
+  # 「选择 Agent 类型」弹窗在新建会话后延迟 ~5s 弹出，可能盖住后续操作，需主动等待确认
+  - do: { page: aml_chat, action: select_agent_mode, args: { mode: "专家模式", timeout_ms: 3000 } }
   - do: { page: aml_chat, action: dismiss_onboarding, args: {} }
   - do: { page: aml_chat, action: new_session, args: {} }
+  - do: { page: aml_chat, action: select_agent_mode, args: { mode: "专家模式", timeout_ms: 30000 } }
   - do: { page: aml_chat, action: send_message, args: { text: "你好" } }
   - do: { page: aml_chat, action: wait_reply_done, args: { timeout_ms: 120000 } }
+  - do: { page: aml_chat, action: capture_context, args: {} }
   - assert: { type: visible, page: aml_chat, target: user_message }
   - assert: { type: text_contains, page: aml_chat, target: user_message, expected: "你好" }
   - assert: { type: visible, page: aml_chat, target: assistant_reply }
+  - assert: { type: visible, page: aml_chat, target: reasoning_steps }
+  - assert: { type: visible, page: aml_chat, target: final_answer_card }
+  - assert: { type: visible, page: aml_chat, target: reply_actions }
   - judge: { note: "v1 预留：回复内容质量由 LLM-as-Judge 判定" }

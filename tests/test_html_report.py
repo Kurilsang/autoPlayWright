@@ -18,11 +18,24 @@ def _write_run(tmp_path: Path) -> Path:
         "duration_ms": 1234,
         "events": [
             {"flow_id": "demo", "index": 0, "kind": "do",
-             "detail": "agent_chat.send_message", "status": "passed",
+             "detail": "agent_chat.capture_context", "status": "passed",
+             "evidence": {
+                 "url": "file:///demo", "captured_at": "2026-09-23T00:00:00",
+                 "turn_count": 2,
+                 "turns": [
+                     {"role": "user", "text": "你好，夹具"},
+                     {"role": "assistant", "answer": "思考过程：想一想\n最终答案：收到",
+                      "thinking": "想一想", "final_answer": "收到",
+                      "timestamp": "2026/09/23 00:00:00"},
+                 ],
+             },
              "duration_ms": 40},
             {"flow_id": "demo", "index": 1, "kind": "assert",
              "detail": "", "status": "failed",
              "error": "AssertionError: 期望 <不存在的文本>",
+             "evidence": {"classification": "hang_loading",
+                          "cause": "会话区卡加载",
+                          "repro": {"url": "http://demo/chat", "observed": "复现步骤"}},
              "screenshot": "demo-step01.png", "duration_ms": 900},
             {"flow_id": "demo", "index": 2, "kind": "judge",
              "detail": "预留", "status": "planned", "duration_ms": 0},
@@ -56,6 +69,12 @@ class TestRenderHtml:
         assert 'src="demo-step01.png"' in text
         # HTML 转义生效（错误文本不会被当标签）
         assert "<不存在的文本>" not in text
+        # 对话上下文证据按轮渲染（用户输入 / 思考过程 / 最终答案）
+        assert "上下文采集 · 2 轮" in text
+        assert "用户输入" in text and "你好，夹具" in text
+        assert "[思考过程]" in text and "[最终答案]" in text
+        # 失败归因与复现信息渲染
+        assert "归因与复现" in text and "hang_loading" in text
 
     def test_missing_summary_raises(self, tmp_path):
         import pytest

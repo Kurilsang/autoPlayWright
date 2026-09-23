@@ -1,0 +1,32 @@
+# Aml Agent 测试环境爬取配置（票 06）：会话链路多状态快照。
+# 状态路径：新建会话 → 弹窗确认 → 发送中 → 完整回答（done）。
+name: aml-chat
+targets:
+  - id: chat-conversation
+    route: /chat
+    steps:
+      - do: { page: aml_chat, action: select_agent_mode, args: { mode: "专家模式", timeout_ms: 3000 } }
+        label: load_popups_dismissed
+      - do: { page: aml_chat, action: dismiss_onboarding }
+        label: popups_dismissed
+        capture: true
+      - do: { page: aml_chat, action: new_session }
+        label: new_session
+      - do: { page: aml_chat, action: select_agent_mode, args: { mode: "专家模式", timeout_ms: 30000 } }
+        label: agent_mode_confirmed
+        capture: true
+      - do: { page: aml_chat, action: send_message, args: { text: "请分步推理：先写思考过程，再给出最终答案。问题：127 是质数吗？" } }
+        label: sent
+        capture: true
+      - do: { page: aml_chat, action: wait_reply_done, args: { timeout_ms: 120000 } }
+        label: reply_done
+        capture: true
+    signals:
+      - name: stop_button
+        selector: { by: text, value: 停止 }
+      - name: reasoning_steps
+        selector: { by: text, value: 推理步骤, exact: false }
+      - name: final_answer_card
+        selector: { by: css, value: "h3:text-is('最终答案')" }
+      - name: history_loading
+        selector: { by: text, value: 加载对话历史中, exact: false }

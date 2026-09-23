@@ -1,0 +1,19 @@
+# 夹具站点爬取配置（票 06 示例 + 框架自测夹具）。
+name: fixture-chat
+targets:
+  - id: chat-main
+    route: /
+    steps:
+      - do: { page: agent_chat, action: new_session }
+        label: new_session
+        capture: true
+      - do: { page: agent_chat, action: send_message, args: { text: "你好，夹具" } }
+        label: sent
+      - do: { page: agent_chat, action: wait_reply_done, args: { timeout_ms: 15000 } }
+        label: reply_done
+        capture: true
+    signals:
+      - name: streaming
+        selector: { by: testid, value: chat-streaming }
+      - name: message_list
+        selector: { by: testid, value: chat-messages }

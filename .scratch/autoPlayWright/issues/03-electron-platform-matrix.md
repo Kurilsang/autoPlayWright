@@ -6,6 +6,8 @@
 
 **Status:** ready-for-agent
 
+> 进度（2026-09-23）：CDP attach 已可用（环境配置 `cdp_endpoint` 即连）；安装包 launch 仍留空待输入（`executable_path`，spec 开放项 2）。
+
 - [ ] 桌面端两种连接方式可用，统一输出 Playwright Page，上层零改动
 - [ ] platforms 字段生效矩阵：共享 flow 两端各执行一遍；desktop-only 在 web 运行时 skip 并在报告中标注原因
 - [ ] 示例 flow 在客户端上执行通过（含会话页到达与发送消息）

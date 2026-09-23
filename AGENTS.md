@@ -14,6 +14,7 @@ python -m venv .venv
 .venv\Scripts\pytest tests flows    # 全部
 .venv\Scripts\pytest flows --apw-headed --apw-slowmo 250  # 调试：窗口可见 + 放慢动作
 .\run_debug.bat                                          # 同上一键调试（可透传 pytest 参数）
+.venv\Scripts\python -m apw.crawler --env test --config configs/crawl/aml_chat.yaml   # 页面状态快照（票 06）
 .venv\Scripts\ruff check src tests  # lint（提交前必须过）
 ```
 
@@ -43,10 +44,11 @@ Python 3.11+ / Playwright（同步 API）/ pytest 9（pytest11 插件入口）/ 
 ## 当前状态（2026-09-23）
 
 - 票 01/02 已交付；T07 预演产物已产品化：`locators/aml_chat.yaml` + `AmlChatPage` + `flows/aml_chat_smoke.yaml`（真实环境冒烟持续绿灯）
+- 票 06 爬虫快照器已交付：`python -m apw.crawler` 状态化爬取（D20 快照骨架），产物入 `.scratch/autoPlayWright/snapshots/`；真实环境 4 状态快照**待人工检查**（票面唯一未勾项）
 - 回复判定 = **完整回答六信号**（停止消失/推理步骤/最终答案/操作行/稳定/加载清除）；`capture_context` 把对话上下文（输入/推理步骤/思考过程/最终答案）写入报告证据
 - 失败取证：EvidenceError 带归因分类（hang_loading/streaming_stuck/reply_incomplete/content_unstable）+ 复现 + 信号时间线 + 冻结截图
 - 测试环境 `http://10.28.28.134:3000/`（免登录）；`aml-agent.amlogic.com` 是正式环境，**勿跑测试**
 - 已知产品缺陷：「加载对话历史中」偶发卡死（前端），复现线索=新建会话→确认 Agent 类型弹窗→随即发送；测试判 fail 取证待产品侧修复
 - 测试基线：`pytest tests` 全绿（框架自测，含证据链路与失败取证用例）；真实环境冒烟通过
 - 留空待输入：仅 Electron 安装包 launch（T03，CDP attach 可用）
-- 下一步：T03/T04/T05/T06 四线并行 → T08；业务用例扩量（v1 目标 20~50 条）
+- 下一步：04 原语库（两档制 + 收口规则）→ 07 生成器（opencode skill）→ 08；业务用例扩量（v1 目标 20~50 条）

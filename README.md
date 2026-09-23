@@ -52,6 +52,7 @@ steps:
 | 命名定位器 | `locators/<page>.yaml`（testid > role+name > placeholder/label > text > css/xpath 候选优先级） |
 | 页面动作 | `src/apw/pages/`（Page Object，平台无关） |
 | 环境配置 | `configs/envs/<env>.yaml`（`--apw-env` 选择） |
+| 页面状态快照 | `configs/crawl/*.yaml`（爬取配置）→ `.scratch/autoPlayWright/snapshots/<env>/`（AI 生成事实依据 + 改版 diff 基线） |
 | JSON 报告 | `reports/<run_id>/<flow_id>.json` + `run-summary.json`（含 `capture_context` 采集的完整对话上下文证据：用户输入 / 推理步骤 / 思考过程 / 最终答案） |
 | HTML 报告 | `reports/<run_id>/report.html`（会话结束自动渲染，单文件、零依赖；也可 `python -m apw.reporter.html_report reports/<run_id>` 重渲染） |
 
@@ -66,6 +67,9 @@ pytest flows --apw-env test                 # 真实测试环境（表单登录�
 # 调试模式：窗口可见 + 放慢动作，实时观察执行过程
 pytest flows --apw-env test --apw-headed --apw-slowmo 250
 # 或直接双击 / 运行 run_debug.bat（等价于上面这条，可追加 pytest 参数）
+
+# 页面状态快照（AI 生成的事实依据 / 页面改版 diff 基线）
+python -m apw.crawler --env test --config configs/crawl/aml_chat.yaml
 ```
 
 ## 当前留空（接缝已就位，等输入）

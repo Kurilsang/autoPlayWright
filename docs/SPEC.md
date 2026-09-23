@@ -1,6 +1,6 @@
 # SPEC：内部 Agent 产品 UI 自动化测试框架（autoPlayWright）
 
-> 状态：已采纳并部分实现（M0/票02 于 2026-09-22 交付；issue tracker 同步仍待定）
+> 状态：已采纳并部分实现（票 01 表单登录、票 02 tracer bullet 于 2026-09-22 交付；T07 人工预演完成；issue tracker 同步仍待定）
 > 来源：2026-09 需求探讨（grilling 决策记录见文末附录）
 > 当前进度以 `AGENTS.md` 与 `.scratch/autoPlayWright/issues/` 为准，本文件是规格与决策记录。
 
@@ -10,7 +10,7 @@
 
 ## Solution
 
-搭建一个分层 UI 自动化测试框架：业务链路用 YAML DSL 描述，由引擎在 pytest 内解释执行；Web 端与 Electron 客户端经由统一驱动抽象共享同一套 Page Object 与用例；断言聚焦确定性部分（组件渲染、状态流转、结构化内容）；提供 AI 半自动生成流水线——爬虫抓取页面结构产出快照，LLM 基于快照生成 DSL 草稿，人工评审后固化入库，CI 稳定回放；执行结果输出步骤级结构化 JSON（机器消费）并映射 Allure 报告（人类消费）。
+搭建一个分层 UI 自动化测试框架：业务链路用 YAML DSL 描述，由引擎在 pytest 内解释执行；Web 端与 Electron 客户端经由统一驱动抽象共享同一套 Page Object 与用例；断言聚焦确定性部分（组件渲染、状态流转、结构化内容）；提供 AI 半自动生成流水线——爬虫抓取页面结构产出快照，LLM 基于快照生成 DSL 草稿，人工评审后固化入库，CI 稳定回放；执行结果输出步骤级结构化 JSON（机器消费）并由内置 HTML 渲染器输出人类可读报告（Allure 结果数据可选）。
 
 核心生产闭环：**新增用例 ≈ 写/审一个 YAML 文件**，pytest 只是无感知的执行壳。
 
@@ -46,12 +46,12 @@
 ### 分层与模块
 
 - `driver`：AppDriver 抽象。两种模式——Web：Playwright 直接 launch 浏览器访问测试环境 URL；桌面端：`_electron.launch` 启动安装包，或 CDP attach（`connect_over_cdp`）已运行的客户端实例。两种模式统一输出标准 Playwright `Page`。
-- `locators`：定位器仓库，按页面组织的 YAML 文件。每个命名定位器含主定位器与备选定位器，选择器优先级：testid > role+name > text > css。AI 生成的候选定位器带来源标记。
+- `locators`：定位器仓库，按页面组织的 YAML 文件。每个命名定位器含主定位器与备选定位器，选择器优先级：testid > role+name > placeholder/label > text > css/xpath（候选书写顺序即优先级）。AI 生成的候选定位器带来源标记。
 - `pages`：Page Object 层。BasePage 提供通用操作（导航、发送消息、等待流式输出结束、截图），每类页面一个子类组合定位器仓库。Page Object 平台无关——共享页面两端复用，客户端独有功能单独建类，由 flow 的 `platforms` 控制生效矩阵。
 - `flows`：业务链路 DSL（YAML）。schema 用 pydantic 定义与校验，非法 DSL 在 pytest 收集期即报错。核心形态（决策压缩版，源自讨论稿）：
 
 ```yaml
-meta:   { id, name, platforms: [web|desktop], tags: [P0|...], owner }
+meta:   { id, name, platforms: [web|desktop], envs: [fixture|test|...], tags: [P0|...], owner }
 vars:   { ... }                      # flow 级变量与测试数据
 steps:
   - do: { page: <PageObject>, action: <方法名>, args: {...} }
@@ -64,7 +64,7 @@ steps:
 - `engine`：DSL 解释器。加载 → 校验 → 顺序执行 steps（通过 Page Object 与钩子注册表）→ 持续产出 StepEvent 事件流。内置"流式输出完成"等待策略（基于可配置的 UI 信号：发送/停止按钮状态等，加超时兜底）。
 - `crawler`（AI 生成侧）：Playwright 驱动的遍历器，产出页面快照 JSON（路由、语义化交互元素：role/name/testid/placeholder）+ 截图。生成器将快照 + 业务描述交给 LLM 产出 flow 草稿与定位器候选，输出为可评审的 diff。快照对比器支持重爬 diff，输出受影响的定位器/页面/链路影响清单。
 - `judge`：v1 仅定义接口形状（判定上下文入参 → 评分/结论/理由的结构化出参），不实现判定逻辑；引擎遇到 `judge` 步骤标记 skip 并写入报告。
-- `reporter`：StepEvent JSON 是第一公民——flow 级明细（每步的输入/实际输出/断言明细/耗时/截图引用）+ run 级汇总。Allure 为渲染层：flow=测试用例，step=allure step，JSON 与截图作为附件。
+- `reporter`：StepEvent JSON 是第一公民——flow 级明细（每步的输入/实际输出/断言明细/耗时/截图引用）+ run 级汇总。人类层由内置 HTML 渲染器承担（会话结束自动产出 `report.html`，单文件零依赖）；Allure 为可选输出（`--alluredir` 产结果数据，flow=测试用例、step=allure step、JSON 与截图作附件）。
 - `runner`/配置：pytest 自动收集 flows 目录并按 `platforms × tags` 参数化为测试项；环境配置（URL、账号、驱动模式）独立于用例。
 
 ### 执行与并发
@@ -84,7 +84,7 @@ Python 3.11+、Playwright（同步 API）、pytest、pytest-xdist、allure-pytes
 2. AI 生成采用"半自动 + 人工固化"：爬取→生成草稿→人工评审入库→CI 回放；不做全自动探索。
 3. 断言 v1 只做确定性断言；LLM-as-Judge 为既定后续计划，本框架仅预留接缝。
 4. 用例载体为混合形态：DSL 描述常规链路，复杂逻辑下沉为 Python 钩子，DSL 引用钩子。
-5. 报告双轨：结构化 JSON（机器）+ Allure（人类），JSON 优先。
+5. 报告双轨：结构化 JSON（机器）+ Allure（人类），JSON 优先。（实现演进 2026-09-22：人类层改为内置 HTML 渲染器，Allure 降为可选，见 reporter 条。）
 
 ## Testing Decisions
 
@@ -108,7 +108,7 @@ Python 3.11+、Playwright（同步 API）、pytest、pytest-xdist、allure-pytes
 
 - **限流是硬约束**：所有执行侧设计（并行度、重试、排队）以"后端 LLM 服务 3~5 并发即限流"为前提。
 - **风险与前置开放项**（进入 M0 前需确认）：
-  - 登录方式：SSO/验证码如何自动化登录，测试账号从哪来。
+  - ~~登录方式~~ 已解决（2026-09-22）：Aml Agent 为账号密码表单登录，凭据走 `configs/secrets.local.yaml`（gitignored）/环境变量，storage_state 回写复用，见票 01。
   - Electron 可执行文件在 CI 上的获取方式（固定安装路径？构建产物下载？）与版本管理和 Playwright 兼容性。
   - 内部 LLM 网关用于草稿生成的选型与配额。
 - 里程碑建议：M0 骨架（驱动双模式 + BasePage + 引擎 + JSON/Allure 报告 + 1 条手写 flow 跑通）→ M1 核心链路覆盖（20~50 条）→ M2 AI 生成流水线（爬虫 + 草稿 + 评审流程）→ M3 快照 diff/影响分析 + Judge 接入。

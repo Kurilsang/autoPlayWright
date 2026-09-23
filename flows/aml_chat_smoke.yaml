@@ -2,7 +2,7 @@
 # 断言全部为确定性内容（组件渲染/用户输入回显），不断言 LLM 措辞。
 meta:
   id: aml-chat-smoke
-  name: Aml Agent 冒烟：新建对话并发送消息
+  name: Agent 冒烟：新建对话并发送消息
   platforms: [web]
   envs: [test]
   tags: [P0, smoke, ai-draft]

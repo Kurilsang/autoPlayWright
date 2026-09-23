@@ -15,5 +15,7 @@ build/
 *.egg-info/
 configs/secrets.local.yaml
 configs/auth-state.json
+configs/envs/test.yaml
+.scratch/**/snapshots/**/*.png
 
 pytest_out.txt

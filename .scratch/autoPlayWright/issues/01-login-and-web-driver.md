@@ -6,7 +6,7 @@
 
 **Blocked by:** None (can start immediately).
 
-- [x] 登录方案 spike 完成并记录决策：Aml Agent 为**账号密码表单登录**（非 SSO）；凭据来源 `configs/secrets.local.yaml`（本地，gitignored）或 `APW_USERNAME`/`APW_PASSWORD` 环境变量（CI）；登录成功后回写 storage_state（`configs/auth-state.json`）供后续运行复用，失效自动重登
+- [x] 登录方案 spike 完成并记录决策：被测产品为**账号密码表单登录**（非 SSO）；凭据来源 `configs/secrets.local.yaml`（本地，gitignored）或 `APW_USERNAME`/`APW_PASSWORD` 环境变量（CI）；登录成功后回写 storage_state（`configs/auth-state.json`）供后续运行复用，失效自动重登
 - [x] AppDriver Web 模式封装完成，对外统一输出 Playwright Page，上层不感知连接细节
 - [x] pytest 连通性冒烟：`tests/test_real_login.py --apw-env test` 自动登录并到达会话页（/chat），「新建对话」入口可见断言通过
 - [x] 登录态复用策略明确：storage_state 命中则跳过表单登录，未命中自动重登并回写

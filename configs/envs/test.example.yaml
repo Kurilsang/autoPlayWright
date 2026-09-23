@@ -1,0 +1,16 @@
+# 真实测试环境配置模板：复制为 configs/envs/test.yaml 后填真实值。
+# test.yaml 已 gitignore 不入库；内网 URL/账号/域名/产品名等敏感信息一律不入库。
+# 凭据不入库：configs/secrets.local.yaml（本地，gitignored）或环境变量（CI）。
+base_url: http://<test-host>:<port>/
+driver:
+  mode: web
+  headless: true
+auth:
+  type: form
+  login_url: http://<test-host>:<port>/login
+  login_path_hint: /login
+  username_selector: "#username"
+  password_selector: "#password"
+  submit_selector: 'button[type="submit"]'
+  state_file: configs/auth-state.json   # 登录成功后回写，后续运行复用会话
+  secrets_file: configs/secrets.local.yaml

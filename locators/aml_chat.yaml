@@ -1,4 +1,4 @@
-# Aml Agent 会话页（真实环境）。由 AI 爬取页面结构生成（T07 预演），人工审核入库。
+# 被测 Agent 会话页（真实环境）。由 AI 爬取页面结构生成（T07 预演），人工审核入库。
 # 真实应用无 data-testid，候选优先使用稳定文案（placeholder/exact text）与结构类名。
 page: aml_chat
 locators:

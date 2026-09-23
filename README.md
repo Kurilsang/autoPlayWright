@@ -1,6 +1,6 @@
 # autoPlayWright（apw）
 
-公司内部 Agent 产品的 UI 自动化测试框架：业务链路用 YAML DSL 描述，pytest 解释执行，
+Agent 产品的 UI 自动化测试框架：业务链路用 YAML DSL 描述，pytest 解释执行，
 Web 端与 Electron 客户端共用一套用例，报告输出结构化 JSON + HTML（Allure 可选）。
 
 - 规格：`docs/SPEC.md`（决策记录见附录）

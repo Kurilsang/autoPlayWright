@@ -39,7 +39,7 @@ Agent 产品有 Web 端和 Electron 客户端，页面多、业务链路多。�
 21. 作为测试平台（机器消费者），我想消费每次运行的 JSON 汇总（用例/步骤/断言三级），这样结果能接入内部看板与趋势统计。
 22. 作为任何人，我想通过 Allure 看到人类可读的报告（含对话内容与截图附件），这样不懂框架也能看懂结果。
 23. 作为新人，我想有一份可直接运行的示例 flow 和使用文档，这样半天内能上手写用例。
-24. 作为框架维护者，我想让 flow schema 中预留 `judge` 字段且 v1 执行时标记 skip，这样后续接入 LLM-as-Judge 不需要改 DSL 结构和存量用例。
+24. 作为框架维护者，我想让 flow schema 中预留 `judge` 字段且 v1 执行时标记 planned，这样后续接入 LLM-as-Judge 不需要改 DSL 结构和存量用例。
 
 ## Implementation Decisions
 
@@ -58,13 +58,15 @@ steps:
   - do: { hook: <注册的 Python 函数名>, args: {...} }   # 逃生舱
   - assert: { type: visible|text_contains|text_regex|element_count|hook,
               target: ..., expected: ..., timeout: ... }
-  - judge:  { ... }                  # v1 预留：校验通过但执行时标记 skip
+  - judge:  { ... }                  # v1 预留：校验通过但执行时标记 planned
 ```
+
+（实现现状 2026-09-24：assert 仅 `visible|text_contains`；`vars`/`hook`/`text_regex`/`element_count` 为票 04 待落。）
 
 - `engine`：DSL 解释器。加载 → 校验 → 顺序执行 steps（通过 Page Object 与钩子注册表）→ 持续产出 StepEvent 事件流。内置"完整回答"完成判定（实现演进 2026-09-23：六信号缺一不可——停止按钮消失、思考过程组件在场、最终答案标识在场、完成态操作行在场、文本稳定、历史加载占位清除；单信号会被推理期/半截渲染误判）。动作返回 dict 即作为结构化证据写入 StepEvent.evidence。实现演进 2026-09-24（评审 P0）：prepare/导航失败转为失败步骤事件（kind=prepare）写入报告——发生即留痕，不再凭空消失；空步骤双层防御（加载期拒绝 + 运行层兜底判 failed），空壳用例不得刷绿。
 - `crawler`（AI 生成侧）：Playwright 驱动的遍历器，产出页面快照 JSON（路由、语义化交互元素：role/name/testid/placeholder）+ 截图。生成器将快照 + 业务描述交给 LLM 产出 flow 草稿与定位器候选，输出为可评审的 diff。快照对比器支持重爬 diff，输出受影响的定位器/页面/链路影响清单。
 - `sanitize`（产物脱敏，实现决策 2026-09-24 评审 P0）：快照/探查产物落盘前统一脱敏为占位符——映射表驱动（真实串只存本地 `configs/sanitize.local.yaml`，模板 `sanitize.example.yaml`），按词边界、长键优先替换；另有通用模式兜底（邮件/有点账号句柄 → `<user>`，http(s) 主机 → `<host>` 路径保留；宁可过掩码不可漏掩码，公网主机一并掩码是有意取舍）。文本类快照（JSON/HTML）不入库，与 PNG 忽略先例一致，忽略清单兜底。
-- `judge`：v1 仅定义接口形状（判定上下文入参 → 评分/结论/理由的结构化出参），不实现判定逻辑；引擎遇到 `judge` 步骤标记 skip 并写入报告。
+- `judge`：v1 仅定义接口形状（判定上下文入参 → 评分/结论/理由的结构化出参），不实现判定逻辑；引擎遇到 `judge` 步骤标记 planned 并写入报告（planned ≠ skipped：skipped 专指平台/环境不匹配未执行）。
 - `reporter`：StepEvent JSON 是第一公民——flow 级明细（每步的输入/实际输出/断言明细/耗时/截图引用）+ run 级汇总。人类层由内置 HTML 渲染器承担（会话结束自动产出 `report.html`，单文件零依赖）；Allure 为可选输出（`--alluredir` 产结果数据，flow=测试用例、step=allure step、JSON 与截图作附件）。实现演进 2026-09-23：报告含完整对话上下文证据（`capture_context` 采集用户输入/推理步骤/思考过程/最终答案），人工核对输入输出与后续 LLM-as-Judge 共用这份数据。实现演进 2026-09-24（评审 P0）：flow 结果扩为三态（passed/failed/skipped），平台/环境不匹配以 skipped + 原因写入明细与汇总，跳过不再无迹可查；run 标识 = 时间戳前缀 + 进程/随机熵后缀全局唯一（并发 worker 与同秒重跑互不覆盖），run 汇总为合并语义（同 flow_id 以本次为准）。
 - `runner`/配置：pytest 自动收集 flows 目录并按 `platforms × tags` 参数化为测试项；环境配置（URL、账号、驱动模式）独立于用例。
 

@@ -31,7 +31,7 @@ Python 3.11+ / Playwright（同步 API）/ pytest 9（pytest11 插件入口）/ 
 - `configs/crawl/*.yaml` — 爬取配置（状态路径 + 完成信号探针，喂生成器）
 - `scripts/` — 生成侧工具脚本（快照摘要等，AI 复用）
 - `reports/` — 运行产物（gitignored；`report.html` 会话结束自动渲染）；`docs/SPEC.md` — 规格与决策记录
-- `.scratch/autoPlayWright/issues/` — 任务票（01~08，依赖序），完成即勾验收框并标 done
+- `.scratch/autoPlayWright/issues/` — 主建任务票（01~08，依赖序）；`.scratch/review-p0/` — 评审修复批（spec + 票 + P1/P2 backlog）；完成即勾验收框并标 done
 - commit 格式：`feat/fix: 一句话` + `- 要点`，极简
 
 ## 硬约束
@@ -41,7 +41,7 @@ Python 3.11+ / Playwright（同步 API）/ pytest 9（pytest11 插件入口）/ 
 - **失败即取证，禁止自愈**：卡死/半截渲染判 fail 并冻结现场（归因/复现/信号时间线/冻结截图随 EvidenceError 入报告），不做自动重载/重试把偶发缺陷跑绿
 - 引擎不 import pytest/allure；报告与 pytest 只是引擎下游消费者
 - 页面元素一律走定位器仓库，禁止散落裸 selector
-- **凭据与内部信息永不入库**：账号密码走 `configs/secrets.local.yaml`（gitignored）或 CI 环境变量 `APW_USERNAME`/`APW_PASSWORD`；内网 URL/域名/IP/API/产品名/个人信息在提交内容与快照产物中一律以占位符呈现（环境真实值只在本地 `configs/envs/test.yaml`）
+- **凭据与内部信息永不入库**：账号密码走 `configs/secrets.local.yaml`（gitignored）或 CI 环境变量 `APW_USERNAME`/`APW_PASSWORD`；内网 URL/域名/IP/API/产品名/个人信息在提交内容与快照产物中一律以占位符呈现（环境真实值只在本地 `configs/envs/test.yaml`）；快照/探查产物落盘自动脱敏（`apw.sanitize`，映射 `configs/sanitize.local.yaml` 真实串仅存本地 + 通用模式兜底）
 
 ## 当前状态（2026-09-24）
 
@@ -53,6 +53,7 @@ Python 3.11+ / Playwright（同步 API）/ pytest 9（pytest11 插件入口）/ 
 - 测试环境地址在本地 `configs/envs/test.yaml`（gitignored，模板 `test.example.yaml`）；正式环境**勿跑测试/爬取**；测试环境免登录直达会话页
 - 已知产品缺陷：「加载对话历史中」偶发卡死（前端），复现线索=新建会话→确认 Agent 类型弹窗→随即发送；测试判 fail 取证待产品侧修复
 - 已知产品行为：工作流编辑器为 React 受控输入，`fill` 不触发 onChange（会静默空提交）——输入一律真实键入（type/insert_text）；运行跑的是服务端已保存版本，手动改动必须先「保存工作流」
-- 测试基线：`pytest tests` 全绿（框架自测，含证据链路与失败取证用例）；工作流 4 条链路真实环境 3 次绿跑
+- 测试基线：`pytest tests` 全绿（框架自测，含证据链路/失败取证/三态报告/脱敏用例）；工作流 4 条链路真实环境 3 次绿跑
+- 评审修复批次 P0 已交付（`.scratch/review-p0/`，6 票全 done）：prepare 失败与空步骤终态留痕、报告三态 + 跳过原因、run 目录唯一化 + 汇总合并、快照脱敏管道、定位器计数与解析同链
 - 留空待输入：仅 Electron 安装包 launch（T03，CDP attach 可用）
-- 下一步：04 原语库（两档制 + 收口规则）→ 07 生成器（opencode skill）→ 08；业务用例扩量（v1 目标 20~50 条）
+- 下一步：评审 P1/P2（见 `.scratch/review-p0/backlog.md`）→ 04 原语库（两档制 + 收口规则）→ 07 生成器（opencode skill）→ 08；业务用例扩量（v1 目标 20~50 条）

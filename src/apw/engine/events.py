@@ -14,7 +14,7 @@ def _now() -> str:
 class StepEvent(BaseModel):
     flow_id: str
     index: int
-    kind: Literal["do", "assert", "judge"]
+    kind: Literal["prepare", "do", "assert", "judge"]
     detail: str = ""
     status: Literal["passed", "failed", "skipped", "planned"]
     error: str = ""
@@ -28,8 +28,19 @@ class FlowResult(BaseModel):
     flow_id: str
     name: str
     platforms: list[str] = Field(default_factory=list)
-    status: Literal["passed", "failed"]
+    status: Literal["passed", "failed", "skipped"]
+    skip_reason: str = ""  # 跳过原因（平台/环境不匹配等），报告核对用例矩阵用
     events: list[StepEvent] = Field(default_factory=list)
     started_at: str = Field(default_factory=_now)
     duration_ms: int = 0
     error: str = ""
+
+    @classmethod
+    def from_spec(cls, spec, **kwargs) -> FlowResult:
+        """按 flow spec 统一装配（三处终态共用：执行/空步骤/跳过）。"""
+        return cls(
+            flow_id=spec.meta.id,
+            name=spec.meta.name,
+            platforms=list(spec.meta.platforms),
+            **kwargs,
+        )

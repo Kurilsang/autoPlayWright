@@ -53,18 +53,44 @@ class FlowRunner:
 
     def run(self, spec: FlowSpec) -> FlowResult:
         t0 = time.perf_counter()
-        if self.prepare:
-            self.prepare()
+        if not spec.steps:  # 运行层兜底：绕过加载校验的空壳同样不得刷绿
+            result = FlowResult.from_spec(
+                spec,
+                status="failed",
+                error="无可执行步骤（steps 为空）",
+                duration_ms=_elapsed_ms(t0),
+            )
+            if self.reporter:
+                self.reporter.write_flow(result)
+            return result
         events: list[StepEvent] = []
-        for idx, step in enumerate(spec.steps):
-            event = self._run_step(spec.meta.id, idx, step)
-            events.append(event)
-            if event.status == "failed":
-                break
-        result = FlowResult(
-            flow_id=spec.meta.id,
-            name=spec.meta.name,
-            platforms=list(spec.meta.platforms),
+        setup_failed = False
+        if self.prepare:
+            try:
+                self.prepare()
+            except Exception as exc:  # noqa: BLE001 - 准备失败是终态留痕，不穿透引擎
+                setup_failed = True
+                events.append(
+                    StepEvent(
+                        flow_id=spec.meta.id,
+                        index=0,
+                        kind="prepare",
+                        detail="prepare",
+                        status="failed",
+                        error=f"{type(exc).__name__}: {exc}",
+                        evidence=getattr(exc, "evidence", None) or {},
+                        screenshot=self._screenshot(spec.meta.id, 0),
+                        duration_ms=_elapsed_ms(t0),
+                    )
+                )
+        if not setup_failed:
+            for idx, step in enumerate(spec.steps):
+                event = self._run_step(spec.meta.id, idx, step)
+                events.append(event)
+                if event.status == "failed":
+                    break
+        result = FlowResult.from_spec(
+            spec,
             status="failed" if any(e.status == "failed" for e in events) else "passed",
             events=events,
             duration_ms=_elapsed_ms(t0),

@@ -210,16 +210,28 @@ class ApwFlowItem(pytest.Item):
     def runtest(self):
         rt = get_runtime(self.config)
         active = "desktop" if rt.env.driver.mode == "electron" else "web"
+        reason = None
         if active not in self.spec.meta.platforms:
-            pytest.skip(f"平台不匹配：flow 需要 {self.spec.meta.platforms}，当前 {active}")
-        if self.spec.meta.envs and rt.env.name not in self.spec.meta.envs:
-            pytest.skip(f"环境不匹配：flow 限定 {self.spec.meta.envs}，当前 {rt.env.name}")
+            reason = f"平台不匹配：flow 需要 {self.spec.meta.platforms}，当前 {active}"
+        elif self.spec.meta.envs and rt.env.name not in self.spec.meta.envs:
+            reason = f"环境不匹配：flow 限定 {self.spec.meta.envs}，当前 {rt.env.name}"
+        if reason:
+            self._record_skip(rt, reason)  # 跳过也是终态留痕，报告可核对用例矩阵
+            pytest.skip(reason)
 
         runner = build_runner(self.config)
         self.result = runner.run(self.spec)
         self._attach_allure()
         if self.result.status != "passed":
             raise ApwFlowError(self.result)
+
+    def _record_skip(self, rt, reason: str) -> None:
+        from apw.engine.events import FlowResult
+
+        self.result = FlowResult.from_spec(
+            self.spec, status="skipped", skip_reason=reason
+        )
+        rt.reporter.write_flow(self.result)
 
     def _attach_allure(self):
         if self.result is None:

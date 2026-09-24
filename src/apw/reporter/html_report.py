@@ -62,6 +62,7 @@ _TEMPLATE = """<!doctype html>
   <div class="total">{total}<span>总数</span></div>
   <div class="total" style="color:#0a7d32">{passed}<span>通过</span></div>
   <div class="total" style="color:#c62828">{failed}<span>失败</span></div>
+  <div class="total" style="color:#5f6368">{skipped}<span>跳过</span></div>
 </div>
 {flow_sections}
 </div></body></html>"""
@@ -74,6 +75,7 @@ _FLOW_SECTION = """
     <span class="meta">{flow_id} · platforms: {platforms}</span>
     <span class="dur">{duration_ms} ms</span>
   </div>
+  {skip_note}
   <table>
     <tr><th>#</th><th>类型</th><th>步骤</th><th>耗时</th><th>结果</th></tr>
     {rows}
@@ -165,11 +167,14 @@ def _render_flow(detail_path: Path) -> str:
     flow = json.loads(detail_path.read_text(encoding="utf-8"))
     icon, color, bg = _badge(flow.get("status", ""))
     rows = "\n".join(_render_row(e) for e in flow.get("events", []))
+    skip_note = ""
+    if flow.get("skip_reason"):
+        skip_note = f'<div class="meta">跳过原因：{_esc(flow["skip_reason"])}</div>'
     return _FLOW_SECTION.format(
         flow_id=_esc(flow.get("flow_id", "")), name=_esc(flow.get("name", "")),
         status=_esc(flow.get("status", "")), icon=icon, c=color, bg=bg,
         platforms=_esc(", ".join(flow.get("platforms", []))),
-        duration_ms=flow.get("duration_ms", 0), rows=rows,
+        duration_ms=flow.get("duration_ms", 0), skip_note=skip_note, rows=rows,
     )
 
 
@@ -192,6 +197,7 @@ def render_html(run_dir: str | Path) -> Path:
         generated=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         css=_CSS, total=summary.get("total", 0),
         passed=summary.get("passed", 0), failed=summary.get("failed", 0),
+        skipped=summary.get("skipped", 0),
         flow_sections="\n".join(sections),
     )
     out = run_dir / "report.html"

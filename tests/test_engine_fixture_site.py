@@ -197,3 +197,108 @@ class TestPrepare:
         )
         runner.run(spec)
         assert len(calls) == 1
+
+    def test_prepare_failure_records_failed_event_and_report(
+        self, apw_driver, apw_repo, apw_pages, tmp_path
+    ):
+        """准备（导航）失败也是终态留痕：失败事件 + 明细 JSON + 汇总 failed，不再凭空消失。"""
+        from apw.engine.runner import FlowRunner
+        from apw.reporter.json_report import JsonReporter
+
+        def boom():
+            raise RuntimeError("导航失败")
+
+        reporter = JsonReporter(tmp_path / "reports")
+        runner = FlowRunner(
+            page=apw_driver.page,
+            repo=apw_repo,
+            pages=apw_pages,
+            prepare=boom,
+            reporter=reporter,
+            screenshot_dir=tmp_path,
+        )
+        spec = FlowSpec(
+            meta=FlowMeta(id="prep-fail", name="准备失败"),
+            steps=[parse_step({"judge": {}}, 0)],
+        )
+        result = runner.run(spec)
+        assert result.status == "failed"
+        event = result.events[0]
+        assert event.status == "failed"
+        assert "导航失败" in event.error
+        assert event.screenshot and Path(event.screenshot).exists()
+        assert event.evidence == {}  # 普通异常证据为空（与步骤失败一致）
+        detail = reporter.out_dir / "prep-fail.json"
+        assert detail.exists() and "prep-fail" in detail.read_text(encoding="utf-8")
+        summary_path = reporter.write_summary()
+        assert summary_path and summary_path.exists()
+        import json
+
+        summary = json.loads(summary_path.read_text(encoding="utf-8"))
+        assert summary["failed"] == 1 and summary["total"] == 1
+
+    def test_prepare_failure_propagates_evidence(
+        self, apw_driver, apw_repo, apw_pages, tmp_path
+    ):
+        """prepare 抛 EvidenceError 时结构化证据原样入失败事件（与步骤失败同构）。"""
+        from apw.engine.runner import FlowRunner
+        from apw.pages.base import EvidenceError
+
+        def boom():
+            raise EvidenceError(
+                "导航冻结［归因: hang_loading］",
+                {"classification": "hang_loading", "repro": {"url": "x"}},
+            )
+
+        runner = FlowRunner(
+            page=apw_driver.page,
+            repo=apw_repo,
+            pages=apw_pages,
+            prepare=boom,
+            screenshot_dir=tmp_path,
+        )
+        spec = FlowSpec(
+            meta=FlowMeta(id="prep-evi", name="准备取证"),
+            steps=[parse_step({"judge": {}}, 0)],
+        )
+        result = runner.run(spec)
+        event = result.events[0]
+        assert event.status == "failed"
+        assert event.evidence["classification"] == "hang_loading"
+        assert event.evidence["repro"] == {"url": "x"}
+
+
+class TestTriStateSummary:
+    """跳过也是终态留痕：明细带原因，汇总三态分列，skipped 不计入 passed。"""
+
+    def test_skipped_flow_recorded_with_reason(self, tmp_path):
+        import json
+
+        from apw.engine.events import FlowResult
+        from apw.reporter.json_report import JsonReporter
+
+        reporter = JsonReporter(tmp_path / "reports")
+        reporter.write_flow(
+            FlowResult(
+                flow_id="s1",
+                name="跳过例",
+                platforms=["desktop"],
+                status="skipped",
+                skip_reason="平台不匹配：flow 需要 ['desktop']，当前 web",
+            )
+        )
+        summary = json.loads(reporter.write_summary().read_text(encoding="utf-8"))
+        assert summary["skipped"] == 1
+        assert summary["passed"] == 0 and summary["failed"] == 0
+        assert summary["flows"][0]["skip_reason"].startswith("平台不匹配")
+
+    def test_empty_steps_fails_not_passed(self, runner):
+        """引擎兜底：即使绕过加载校验拿到空步骤，也判 failed 而非刷绿。"""
+        from apw.dsl.schema import FlowSpec
+
+        spec = FlowSpec.model_construct(
+            meta=FlowMeta(id="empty", name="空壳"), steps=[]
+        )
+        result = runner.run(spec)
+        assert result.status == "failed"
+        assert result.error  # 明确错误信息，不得为 passed

@@ -75,9 +75,39 @@ class TestRenderHtml:
         assert "[思考过程]" in text and "[最终答案]" in text
         # 失败归因与复现信息渲染
         assert "归因与复现" in text and "hang_loading" in text
+        # 旧格式汇总（无 skipped 键）向后兼容：三态统计卡默认 0
+        assert "跳过</span>" in text
 
     def test_missing_summary_raises(self, tmp_path):
         import pytest
 
         with pytest.raises(FileNotFoundError):
             render_html(tmp_path)
+
+    def test_renders_skipped_with_reason(self, tmp_path):
+        """三态渲染：skipped 徽章 + 跳过原因 + 汇总三态统计卡。"""
+        run_dir = tmp_path / "20260922-000001"
+        run_dir.mkdir(parents=True)
+        reason = "平台不匹配：flow 需要 ['desktop']，当前 web"
+        flow = {
+            "flow_id": "skip1", "name": "跳过例", "platforms": ["desktop"],
+            "status": "skipped", "skip_reason": reason,
+            "duration_ms": 0, "events": [],
+        }
+        (run_dir / "skip1.json").write_text(
+            json.dumps(flow, ensure_ascii=False), encoding="utf-8"
+        )
+        summary = {
+            "run_id": "20260922-000001", "total": 1,
+            "passed": 0, "failed": 0, "skipped": 1,
+            "flows": [{"flow_id": "skip1", "name": "跳过例", "status": "skipped",
+                       "duration_ms": 0, "detail": "skip1.json",
+                       "skip_reason": reason}],
+        }
+        (run_dir / "run-summary.json").write_text(
+            json.dumps(summary, ensure_ascii=False), encoding="utf-8"
+        )
+        text = render_html(run_dir).read_text(encoding="utf-8")
+        assert "- skipped" in text  # 徽章图标+状态对（非裸文本）
+        assert "跳过原因" in text and "平台不匹配" in text
+        assert "跳过</span>" in text  # 三态统计卡

@@ -84,10 +84,24 @@ class TestLoadFlow:
         with pytest.raises(ValueError, match="必须且只能包含"):
             load_flow(f)
 
+    def test_empty_steps_rejected_at_load(self, tmp_path):
+        """空壳用例收集期即拒绝（非法 DSL 收集期报错），不得进入执行。"""
+        f = tmp_path / "empty.yaml"
+        f.write_text("meta: {id: t, name: n}\nsteps: []\n", encoding="utf-8")
+        with pytest.raises(ValueError, match="不能为空"):
+            load_flow(f)
+
+    def test_missing_steps_rejected_at_load(self, tmp_path):
+        f = tmp_path / "nosteps.yaml"
+        f.write_text("meta: {id: t, name: n}\n", encoding="utf-8")
+        with pytest.raises(ValueError, match="不能为空"):
+            load_flow(f)
+
     def test_platforms_desktop(self, tmp_path):
         f = tmp_path / "d.yaml"
         f.write_text(
-            "meta: {id: d, name: n, platforms: [desktop]}\nsteps: []\n",
+            "meta: {id: d, name: n, platforms: [desktop]}\n"
+            "steps:\n  - judge: {}\n",
             encoding="utf-8",
         )
         assert load_flow(f).meta.platforms == ["desktop"]

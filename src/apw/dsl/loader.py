@@ -19,6 +19,8 @@ def load_flow(path: str | Path) -> FlowSpec:
     raw_steps = data.get("steps") or []
     if not isinstance(raw_steps, list):
         raise ValueError(f"{path}: steps 必须是列表")
+    if not raw_steps:
+        raise ValueError(f"{path}: steps 不能为空（空壳用例不允许）")
     steps = [parse_step(raw, i) for i, raw in enumerate(raw_steps)]
 
     return FlowSpec.model_validate(

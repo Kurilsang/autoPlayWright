@@ -1,0 +1,49 @@
+# 工作流功能首轮探查配置（生成侧资产）：找工作流入口 + 逐入口页面结构快照。
+# 探查期用 probe 保留名的通用原语推进状态；页面对象产品化后可把 probe 步骤
+# 替换为 page: aml_workflow 的动作（参考 configs/crawl/aml_chat.yaml）。
+# 产物落 .scratch/autoPlayWright/snapshots/<env>/（gitignored）。
+name: workflow-probe
+targets:
+  - id: nav-scan
+    route: /            # 工作流入口未知：从首页侧边栏/顶栏候选入口逐个探查
+    steps:
+      # 真实环境常见拦截层（延迟弹窗/新手引导），先幂等清掉，避免盖住导航点击
+      - do: { page: aml_chat, action: select_agent_mode, args: { mode: "专家模式", timeout_ms: 3000 } }
+        label: popups_dismissed
+      - do: { page: aml_chat, action: dismiss_onboarding, args: {} }
+        label: onboarding_dismissed
+        capture: true
+      # 侧边栏候选入口（optional 点击未命中静默跳过，探查多假设并行试错）
+      - do: { page: probe, action: click, args: { selector: { by: text, value: 创作与调试 }, optional: true, timeout_ms: 3000 } }
+        label: nav_create_debug
+        capture: true
+      - do: { page: probe, action: goto, args: { route: "/" } }
+        label: back_home
+      - do: { page: aml_chat, action: dismiss_onboarding, args: {} }
+        label: onboarding_dismissed_2
+      - do: { page: probe, action: click, args: { selector: { by: text, value: 任务 }, optional: true, timeout_ms: 3000 } }
+        label: nav_tasks
+        capture: true
+      - do: { page: probe, action: goto, args: { route: "/" } }
+        label: back_home_2
+      - do: { page: aml_chat, action: dismiss_onboarding, args: {} }
+        label: onboarding_dismissed_3
+      - do: { page: probe, action: click, args: { selector: { by: text, value: 更多场景 }, optional: true, timeout_ms: 3000 } }
+        label: nav_more_scenes
+        capture: true
+      - do: { page: probe, action: goto, args: { route: "/" } }
+        label: back_home_3
+      - do: { page: aml_chat, action: dismiss_onboarding, args: {} }
+        label: onboarding_dismissed_4
+      - do: { page: probe, action: click, args: { selector: { by: text, value: 工作区 }, optional: true, timeout_ms: 3000 } }
+        label: nav_workspace
+        capture: true
+      - do: { page: probe, action: goto, args: { route: "/" } }
+        label: back_home_4
+      - do: { page: aml_chat, action: dismiss_onboarding, args: {} }
+        label: onboarding_dismissed_5
+      - do: { page: probe, action: click, args: { selector: { by: text, value: 软件中心 }, optional: true, timeout_ms: 3000 } }
+        label: nav_software_center
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "software_center" } }
+        label: software_center_dom

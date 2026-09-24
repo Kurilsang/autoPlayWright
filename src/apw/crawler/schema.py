@@ -57,6 +57,7 @@ class SnapshotElement(BaseModel):
     testid: str = ""
     placeholder: str = ""
     tag: str = ""
+    href: str = ""  # 链接目标（SPA 导航关系发现）
     classes: list[str] = Field(default_factory=list)
     text: str = ""
     interactable: bool = False

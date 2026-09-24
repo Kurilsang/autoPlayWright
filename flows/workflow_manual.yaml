@@ -1,0 +1,30 @@
+# 工作流：非 AI 编码（手动「编辑」写固定脚本）→ 保存 → 运行。
+# 断言全部为确定性内容（组件状态/固定脚本产物/输入回显），不断言 LLM 措辞。
+# 产品约定：运行的是服务端已保存版本，手动改动必须先「保存工作流」。
+meta:
+  id: workflow-manual
+  name: 工作流：手动写脚本保存并运行（非 AI 编码）
+  platforms: [web]
+  envs: [test]
+  tags: [P1, workflow, manual-code]
+  owner: qa
+steps:
+  - do: { page: aml_workflow, action: new_workflow, args: { name: "apw-ui-test-manual", visibility: "私有" } }
+  - do:
+      page: aml_workflow
+      action: type_script
+      args:
+        script: |
+          def main(wf):
+              with wf.step("n1", "打印 hello"):
+                  wf.log("hello")
+                  wf.set_output("greeting", "hello")
+  - assert: { type: visible, page: aml_workflow, target: saved_badge }
+  - assert: { type: visible, page: aml_workflow, target: flow_node_hello }
+  - do: { page: aml_workflow, action: start_run, args: {} }
+  - do: { page: aml_workflow, action: wait_run_done, args: { timeout_ms: 120000 } }
+  - do: { page: aml_workflow, action: capture_context, args: {} }
+  - assert: { type: visible, page: aml_workflow, target: run_done_marker }
+  - assert: { type: visible, page: aml_workflow, target: run_log_hello }
+  - assert: { type: text_contains, page: aml_workflow, target: run_started_name_line, expected: "apw-ui-test-manual" }
+  - judge: { note: "v1 预留：产物内容质量由 LLM-as-Judge 判定" }

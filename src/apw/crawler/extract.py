@@ -79,6 +79,7 @@ _EXTRACT_JS = r"""
       region: regionOf(el),
       role, accessible_name: (name || '').slice(0, 120),
       testid, placeholder, tag,
+      href: el.getAttribute('href') || '',
       classes: Array.from(el.classList || []).slice(0, 6),
       text,
       interactable: ['a', 'button', 'input', 'textarea', 'select', 'summary']

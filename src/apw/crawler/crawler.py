@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from apw.crawler.extract import extract_page
+from apw.crawler.probe import ProbePage
 from apw.crawler.schema import CrawlConfig, CrawlTarget, Snapshot
 from apw.dsl.schema import DoAction
 from apw.locators.repo import build_locator
@@ -67,7 +68,10 @@ class Crawler:
         return paths
 
     def _exec_do(self, action: DoAction) -> None:
-        obj = self.pages.create(action.page, page=self.page, repo=self.repo)
+        if action.page == ProbePage.page_name:  # 保留名：生成侧探查原语，不进引擎注册表
+            obj = ProbePage(page=self.page, repo=self.repo)
+        else:
+            obj = self.pages.create(action.page, page=self.page, repo=self.repo)
         obj.screenshot_dir = self.out_dir  # 动作失败取证（EvidenceError 冻结截图）落快照目录
         fn = getattr(obj, action.action, None)
         if not callable(fn):

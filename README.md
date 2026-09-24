@@ -52,8 +52,9 @@ steps:
 | 命名定位器 | `locators/<page>.yaml`（testid > role+name > placeholder/label > text > css/xpath 候选优先级） |
 | 页面动作 | `src/apw/pages/`（Page Object，平台无关） |
 | 环境配置 | `configs/envs/<env>.yaml`（`--apw-env` 选择） |
-| 页面状态快照 | `configs/crawl/*.yaml`（爬取配置）→ `.scratch/autoPlayWright/snapshots/<env>/`（AI 生成事实依据 + 改版 diff 基线） |
-| JSON 报告 | `reports/<run_id>/<flow_id>.json` + `run-summary.json`（含 `capture_context` 采集的完整对话上下文证据：用户输入 / 推理步骤 / 思考过程 / 最终答案） |
+| 脱敏映射 | `configs/sanitize.local.yaml`（敏感串→占位符，真实值仅存本地；模板 `configs/sanitize.example.yaml`）——快照/探查产物落盘前自动脱敏 |
+| 页面状态快照 | `configs/crawl/*.yaml`（爬取配置）→ `.scratch/autoPlayWright/snapshots/<env>/`（AI 生成事实依据 + 改版 diff 基线；JSON/HTML/PNG 均不入库） |
+| JSON 报告 | `reports/<run_id>/<flow_id>.json` + `run-summary.json`（run_id = 时间戳+熵后缀全局唯一，汇总为合并语义；含 `capture_context` 采集的完整对话上下文证据：用户输入 / 推理步骤 / 思考过程 / 最终答案，三态 passed/failed/skipped + 跳过原因） |
 | HTML 报告 | `reports/<run_id>/report.html`（会话结束自动渲染，单文件、零依赖；也可 `python -m apw.reporter.html_report reports/<run_id>` 重渲染） |
 
 Allure 集成（可选）：默认无需 Allure 工具链；需要 Allure 平台消费时加 `--alluredir=allure-results`，用 Allure CLI/平台读取结果数据。

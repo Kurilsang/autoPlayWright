@@ -148,3 +148,5 @@ Python 3.11+、Playwright（同步 API）、pytest、pytest-xdist、allure-pytes
 | D18 | 探索区工作区与快照骨架 | 工作区 `workspace/`（gitignored）跑 AI 临时脚本，产物归档 `.scratch/` 作生成器素材；快照 = 路由 + 语义化交互元素（含定位器候选）+ 完成信号在场性 + 截图引用 + **状态路径标注**（同页面多状态多份快照）（2026-09-23） |
 | D19 | 动作原语两档制 | 定稿（Q20 通过）：语义原语（含链路级完成判定/取证）+ 基础原语（元素级，成功=locator 状态）；flow 用到任一基础原语必须以 `assert` 收口，schema 收集期静态检查——「点了就算成功」不得成为 pass 依据（2026-09-23） |
 | D20 | 快照 schema 骨架 | 定稿（Q21 通过）：route/url/state_path/elements（name_hint/region/role/candidates/…）/signals/screenshots/dom_excerpt；字段宁多勿缺，dom_excerpt 作可选保留（2026-09-23） |
+| D21 | 探查原语与 scripts/ 升格 | 生成侧探查原语（crawler 保留名 `page: probe`，goto/click/type/insert/dump_dom）服务未知页面首轮取证，不占流程原语两档配额、流程用例禁用；`scripts/` 升格经人工判定执行（snapshot_summary，2026-09-24 用户授权）（2026-09-24） |
+| D22 | 敏感红线机器门禁 | 红线两度返工（e659178 出库、2026-09-24 脱敏批）达「同类违规反复」阈值 → 入库文件扫描门禁 `tests/test_no_secrets.py`（内网 IP/凭据值/产品名），提交前随 `pytest tests` 强制执行（2026-09-24） |

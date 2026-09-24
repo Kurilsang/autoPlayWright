@@ -18,6 +18,16 @@ python -m venv .venv
 .venv\Scripts\ruff check src tests  # lint（提交前必须过）
 ```
 
+## 怎么加用例
+
+新页面五步走（同页面新链路从第 4 步起）：
+
+1. **探页面**：写 `configs/crawl/<page>_probe.yaml`，用 `page: probe` 探查原语推进状态并 dump_dom（仅生成侧探查用，流程用例禁用）→ `python -m apw.crawler --env test --config …` → `python scripts/snapshot_summary.py` 过结构
+2. **补定位器**：`locators/<page>.yaml`（候选优先级见下，来源标 manual/ai）
+3. **补页面对象**：`src/apw/pages/<page>.py`（动作=语义原语：链路级完成判定 + 失败取证），注册进 `engine/registry.py::default_registry()`
+4. **写 flow**：`flows/<case>.yaml`（do/assert/judge）——只断言确定性内容，LLM 产出只进 `capture_context` 证据
+5. **过验收门（D15）**：收集期 schema 校验 + `ruff check src tests` + 真实环境绿跑 ≥3 次（`pytest flows/<case>.yaml --apw-env test`）
+
 ## 技术栈
 
 Python 3.11+ / Playwright（同步 API）/ pytest 9（pytest11 插件入口）/ pydantic v2 / PyYAML / allure-pytest。
@@ -41,12 +51,12 @@ Python 3.11+ / Playwright（同步 API）/ pytest 9（pytest11 插件入口）/ 
 - **失败即取证，禁止自愈**：卡死/半截渲染判 fail 并冻结现场（归因/复现/信号时间线/冻结截图随 EvidenceError 入报告），不做自动重载/重试把偶发缺陷跑绿
 - 引擎不 import pytest/allure；报告与 pytest 只是引擎下游消费者
 - 页面元素一律走定位器仓库，禁止散落裸 selector
-- **凭据与内部信息永不入库**：账号密码走 `configs/secrets.local.yaml`（gitignored）或 CI 环境变量 `APW_USERNAME`/`APW_PASSWORD`；内网 URL/域名/IP/API/产品名/个人信息在提交内容与快照产物中一律以占位符呈现（环境真实值只在本地 `configs/envs/test.yaml`）；快照/探查产物落盘自动脱敏（`apw.sanitize`，映射 `configs/sanitize.local.yaml` 真实串仅存本地 + 通用模式兜底）
+- **凭据与内部信息永不入库**：账号密码走 `configs/secrets.local.yaml`（gitignored）或 CI 环境变量 `APW_USERNAME`/`APW_PASSWORD`；内网 URL/域名/IP/API/产品名/个人信息在提交内容与快照产物中一律以占位符呈现（环境真实值只在本地 `configs/envs/test.yaml`）；快照/探查产物落盘自动脱敏（`apw.sanitize`，映射 `configs/sanitize.local.yaml` 真实串仅存本地 + 通用模式兜底）；入库红线有机器门禁 `tests/test_no_secrets.py`（内网 IP/凭据值/产品名扫描）
 
 ## 当前状态（2026-09-24）
 
 - 票 01/02 已交付；T07 预演产物已产品化：`locators/aml_chat.yaml` + `AmlChatPage` + `flows/aml_chat_smoke.yaml`（真实环境冒烟持续绿灯）
-- 票 06 爬虫快照器已交付：`python -m apw.crawler` 状态化爬取（D20 快照骨架），产物入 `.scratch/autoPlayWright/snapshots/`；另有 `page: probe` 探查原语（生成侧保留名，goto/click/type/insert/dump_dom，未知页面首轮探查用，流程用例禁用）与 `scripts/snapshot_summary.py` 快照摘要工具
+- 票 06 爬虫快照器已交付：`python -m apw.crawler` 状态化爬取（D20 快照骨架），产物入 `.scratch/autoPlayWright/snapshots/`；另有 `page: probe` 探查原语（生成侧保留名，goto/click/type/insert/dump_dom，未知页面首轮探查用，流程用例禁用）与 `scripts/snapshot_summary.py` 快照摘要工具；**pending**：票面「快照语义人工检查」未勾
 - 工作流功能（`/workflows` 编辑器）资产已入库：`locators/aml_workflow.yaml` + `AmlWorkflowPage` + `configs/crawl/workflow{,_probe}.yaml` + 4 条 flows——手动写码保存运行（非 AI 编码）/ AI 编写生成运行 / 并发 2 个 AI 生成任务 / 并发 2 个 AI 运行任务（并发 UI 校验：逐标签身份核对，串台/卡死判 fail 冻结取证）
 - 回复判定 = **完整回答六信号**（停止消失/推理步骤/最终答案/操作行/稳定/加载清除）；`capture_context` 把对话上下文（输入/推理步骤/思考过程/最终答案）写入报告证据
 - 失败取证：EvidenceError 带归因分类（hang_loading/streaming_stuck/reply_incomplete/content_unstable + gen_stuck/gen_incomplete/run_stuck/run_incomplete/identity_mismatch）+ 复现 + 信号时间线 + 冻结截图

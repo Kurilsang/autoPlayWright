@@ -43,6 +43,7 @@ steps:
 ```
 
 真实环境已有首条 AI 生成的链路可参考：`flows/aml_chat_smoke.yaml`（`--apw-env test` 执行）。
+新页面的完整新增流程（探查快照 → 定位器 → 页面对象 → flow → 验收门）见 `AGENTS.md`「怎么加用例」。
 
 配套要素：
 

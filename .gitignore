@@ -16,6 +16,9 @@ build/
 configs/secrets.local.yaml
 configs/auth-state.json
 configs/envs/test.yaml
+configs/sanitize.local.yaml
 .scratch/**/snapshots/**/*.png
+.scratch/**/snapshots/**/*.json
+.scratch/**/snapshots/**/*.html
 
 pytest_out.txt

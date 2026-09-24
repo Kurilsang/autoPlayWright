@@ -56,3 +56,22 @@ class TestCrawlerFixtureSite:
         assert snapshot.signals["message_list"]["present"] is True
         assert snapshot.signals["streaming"]["present"] is False  # 完成态
         assert snapshot.url and snapshot.dom_excerpt
+
+    def test_snapshot_sanitized_before_write(
+        self, apw_driver, apw_repo, apw_pages, tmp_path
+    ):
+        """快照落盘前统一脱敏：敏感串→占位符，结构对拍不变。"""
+        crawler = Crawler(
+            page=apw_driver.page,
+            repo=apw_repo,
+            pages=apw_pages,
+            env="fixture",
+            out_dir=tmp_path,
+            prepare=apw_driver.goto_base,
+            sanitize_mapping={"Agent Chat Fixture": "<product>"},
+        )
+        paths = crawler.run_config(_load_config())
+        raw = paths[0].read_text(encoding="utf-8")
+        assert "<product>" in raw
+        assert "Agent Chat Fixture" not in raw
+        Snapshot.model_validate_json(raw)  # 结构保留

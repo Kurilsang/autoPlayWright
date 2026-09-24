@@ -5,8 +5,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from apw.locators.repo import build_locator
-
 if TYPE_CHECKING:
     from playwright.sync_api import Locator, Page
 
@@ -48,6 +46,7 @@ class BasePage:
 
     page_name: str = ""
     screenshot_dir: Path | None = None  # 引擎装配：动作可产出截图证据
+    sanitize_mapping: dict[str, str] = {}  # 引擎装配：敏感串→占位符，产物落盘前脱敏
 
     def __init__(self, *, page: Page, repo: LocatorRepo) -> None:
         self.page = page
@@ -70,9 +69,11 @@ class BasePage:
         return self.repo.resolve(self.page, self.page_name, name)
 
     def count(self, name: str) -> int:
-        """软计数：元素不存在返回 0 而非抛错（用于完成信号等预期缺席的探测）。"""
-        entry = self.repo.page(self.page_name).locators[name]
-        return build_locator(self.page, entry.candidates[0]).count()
+        """软计数：元素不存在返回 0 而非抛错（用于完成信号等预期缺席的探测）。
+
+        与硬解析同链（候选回退）；未知定位器名抛 LocatorNotFound。
+        """
+        return self.repo.count(self.page, self.page_name, name)
 
     def build_context(self, data: dict) -> dict:
         """把页面采集的原始 turns 规整为报告证据结构（对话上下文）。

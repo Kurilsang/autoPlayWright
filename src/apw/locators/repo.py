@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, NamedTuple
 
 import yaml
 from pydantic import BaseModel, Field, TypeAdapter
@@ -31,10 +31,14 @@ class LocatorEntry(BaseModel):
 
 
 class LocatorNotFound(LookupError):
-    def __init__(self, page_name: str, locator_name: str) -> None:
+    def __init__(
+        self, page_name: str, locator_name: str, errors: list[str] | None = None
+    ) -> None:
         self.page_name = page_name
         self.locator_name = locator_name
-        super().__init__(f"定位器未命中: {page_name}.{locator_name}")
+        self.errors = errors or []
+        detail = f"（候选失败明细: {'; '.join(self.errors)}）" if self.errors else ""
+        super().__init__(f"定位器未命中: {page_name}.{locator_name}{detail}")
 
 
 class PageLocators(BaseModel):
@@ -60,6 +64,14 @@ def build_locator(page: Page, sel: Selector) -> Locator:
     if sel.by == "css":
         return page.locator(sel.value)
     return page.locator(f"xpath={sel.value}")
+
+
+class _Hit(NamedTuple):
+    """候选回退链的即时命中：哪个选择器、什么定位器、命中几处。"""
+
+    sel: Selector
+    loc: Locator
+    count: int
 
 
 class LocatorRepo:
@@ -99,6 +111,30 @@ class LocatorRepo:
     def page_names(self) -> list[str]:
         return sorted(self._pages)
 
+    def _entry(self, page_name: str, locator_name: str) -> LocatorEntry:
+        entry = self.page(page_name).locators.get(locator_name)
+        if entry is None:
+            raise LocatorNotFound(page_name, locator_name)
+        return entry
+
+    def _first_hit(self, page: Page, entry: LocatorEntry) -> _Hit | None:
+        """候选回退链的即时探测：依序返回首个命中候选。"""
+        for sel in entry.candidates:
+            loc = build_locator(page, sel)
+            n = loc.count()
+            if n > 0:
+                return _Hit(sel, loc, n)
+        return None
+
+    def count(self, page: Page, page_name: str, locator_name: str) -> int:
+        """软计数：与 resolve 同一条候选回退链。
+
+        预期缺席的探测语义保持——全候选未命中返回 0 而非抛错（完成信号依赖此语义）；
+        未知定位器名抛 LocatorNotFound（名错是配置错误，缺席是预期状态）。
+        """
+        hit = self._first_hit(page, self._entry(page_name, locator_name))
+        return hit.count if hit else 0
+
     def resolve(
         self,
         page: Page,
@@ -107,17 +143,17 @@ class LocatorRepo:
         probe_timeout_ms: int = 500,
     ) -> Locator:
         """依序探测候选定位器：主候选即时命中零开销，回退仅在失败路径付出探测成本。"""
-        entry = self.page(page_name).locators.get(locator_name)
-        if entry is None:
-            raise LocatorNotFound(page_name, locator_name)
+        entry = self._entry(page_name, locator_name)
+        hit = self._first_hit(page, entry)
+        if hit is not None:
+            return hit.loc.first
         errors: list[str] = []
         for sel in entry.candidates:
             loc = build_locator(page, sel)
-            if loc.count() > 0:
-                return loc.first
             try:
                 loc.first.wait_for(state="attached", timeout=probe_timeout_ms)
                 return loc.first
             except Exception as exc:  # noqa: BLE001 - 收集所有候选失败原因
-                errors.append(f"{sel.by}={sel.value!r}: {type(exc).__name__}")
-        raise LocatorNotFound(page_name, locator_name)
+                reason = str(exc)[:80]
+                errors.append(f"{sel.by}={sel.value!r}: {type(exc).__name__}: {reason}")
+        raise LocatorNotFound(page_name, locator_name, errors)

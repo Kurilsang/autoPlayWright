@@ -3,7 +3,7 @@
   "env": "test",
   "route": "/chat",
   "url": "http://<test-host>/chat",
-  "title": "Aml Agent",
+  "title": "<product> Agent",
   "state_path": [
     "load_popups_dismissed",
     "popups_dismissed"
@@ -4542,10 +4542,10 @@
       ]
     },
     {
-      "name_hint": "aml_agent_培训系列课程",
+      "name_hint": "<product>_培训系列课程",
       "region": "sidebar",
       "role": "button",
-      "accessible_name": "Aml-Agent 培训系列课程",
+      "accessible_name": "<product> 培训系列课程",
       "testid": "",
       "placeholder": "",
       "tag": "button",
@@ -4564,12 +4564,12 @@
         {
           "by": "role",
           "value": "button",
-          "name": "Aml-Agent 培训系列课程",
+          "name": "<product> 培训系列课程",
           "exact": true
         },
         {
           "by": "text",
-          "value": "Aml-Agent 培训系列课程",
+          "value": "<product> 培训系列课程",
           "name": "",
           "exact": true
         },

@@ -4,6 +4,43 @@ from __future__ import annotations
 import pytest
 
 from apw.locators.repo import LocatorRepo
+from apw.pages.base import BasePage
+
+
+class FakeLoc:
+    """可控命中数的假定位器：count 立即返回，wait_for 模拟未附着。"""
+
+    def __init__(self, n: int) -> None:
+        self._n = n
+
+    def count(self) -> int:
+        return self._n
+
+    @property
+    def first(self) -> FakeLoc:
+        return self
+
+    def wait_for(self, **kwargs) -> None:
+        raise TimeoutError("not attached")
+
+
+class FakePage:
+    """命中数按 (定位方式, 值) 配置，缺省 0。"""
+
+    def __init__(self, hits: dict[tuple[str, str], int]) -> None:
+        self.hits = hits
+
+    def _loc(self, by: str, value: str) -> FakeLoc:
+        return FakeLoc(self.hits.get((by, value), 0))
+
+    def get_by_test_id(self, value: str) -> FakeLoc:
+        return self._loc("testid", value)
+
+    def locator(self, value: str) -> FakeLoc:
+        return self._loc("css", value)
+
+    def get_by_text(self, value: str, exact: bool = True) -> FakeLoc:
+        return self._loc("text", value)
 
 
 @pytest.fixture
@@ -60,26 +97,39 @@ class TestLoad:
 class TestResolveErrors:
     def test_unknown_locator_raises_lookup(self, repo_dir):
         repo = LocatorRepo.load(repo_dir)
-
-        class FakeFirst:
-            def count(self):
-                return 0
-
-            def wait_for(self, **kw):
-                raise TimeoutError("nope")
-
-        class FakeLoc:
-            first = FakeFirst()
-
-            def count(self):
-                return 0
-
-        class FakePage:
-            def get_by_test_id(self, v):
-                return FakeLoc()
-
-            def locator(self, v):
-                return FakeLoc()
-
         with pytest.raises(LookupError, match="chat_input"):
-            repo.resolve(FakePage(), "agent_chat", "chat_input", probe_timeout_ms=1)
+            repo.resolve(
+                FakePage({}), "agent_chat", "chat_input", probe_timeout_ms=1
+            )
+
+    def test_resolve_all_miss_reports_each_candidate(self, repo_dir):
+        """全候选未命中：异常携带逐候选失败明细（选择器 + 异常类型 + 原因）。"""
+        repo = LocatorRepo.load(repo_dir)
+        with pytest.raises(LookupError) as excinfo:
+            repo.resolve(FakePage({}), "agent_chat", "chat_input", probe_timeout_ms=1)
+        msg = str(excinfo.value)
+        assert "chat-input" in msg and "textarea" in msg
+        assert "TimeoutError" in msg and "not attached" in msg
+
+
+class FakeChatPage(BasePage):
+    page_name = "agent_chat"
+
+
+class TestSoftCountChain:
+    """软计数与硬解析同链：主候选未命中自动回退，未知定位器名抛定位器未找到。"""
+
+    def test_count_falls_back_to_next_candidate(self, repo_dir):
+        repo = LocatorRepo.load(repo_dir)
+        page = FakePage({("css", "textarea"): 2})  # 主候选 testid 未命中
+        assert FakeChatPage(page=page, repo=repo).count("chat_input") == 2
+
+    def test_count_all_miss_returns_zero(self, repo_dir):
+        """预期缺席的探测语义保持：全候选未命中返回 0，不抛错（完成信号依赖此语义）。"""
+        repo = LocatorRepo.load(repo_dir)
+        assert FakeChatPage(page=FakePage({}), repo=repo).count("chat_input") == 0
+
+    def test_count_unknown_name_raises_not_found(self, repo_dir):
+        repo = LocatorRepo.load(repo_dir)
+        with pytest.raises(LookupError, match="ghost"):
+            FakeChatPage(page=FakePage({}), repo=repo).count("ghost")

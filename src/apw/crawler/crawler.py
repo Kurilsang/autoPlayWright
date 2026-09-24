@@ -16,6 +16,7 @@ from apw.crawler.probe import ProbePage
 from apw.crawler.schema import CrawlConfig, CrawlTarget, Snapshot
 from apw.dsl.schema import DoAction
 from apw.locators.repo import build_locator
+from apw.sanitize import sanitize_text
 
 if TYPE_CHECKING:
     from playwright.sync_api import Page
@@ -38,6 +39,7 @@ class Crawler:
         env: str,
         out_dir: str | Path,
         prepare: Callable[[], None] | None = None,
+        sanitize_mapping: dict[str, str] | None = None,
     ) -> None:
         self.page = page
         self.repo = repo
@@ -45,6 +47,7 @@ class Crawler:
         self.env = env
         self.out_dir = Path(out_dir) / env
         self.prepare = prepare
+        self.sanitize_mapping = dict(sanitize_mapping or {})  # 敏感串→占位符，落盘前统一脱敏
 
     def run_config(self, config: CrawlConfig) -> list[Path]:
         produced: list[Path] = []
@@ -73,6 +76,7 @@ class Crawler:
         else:
             obj = self.pages.create(action.page, page=self.page, repo=self.repo)
         obj.screenshot_dir = self.out_dir  # 动作失败取证（EvidenceError 冻结截图）落快照目录
+        obj.sanitize_mapping = self.sanitize_mapping  # 装配脱敏映射（dump_dom 等产物落盘时使用）
         fn = getattr(obj, action.action, None)
         if not callable(fn):
             raise AttributeError(f"页面 {action.page} 没有动作 {action.action!r}")
@@ -118,5 +122,6 @@ class Crawler:
             dom_excerpt=excerpt,
         )
         path = self.out_dir / f"{stem}.json"
-        path.write_text(snapshot.model_dump_json(indent=2), encoding="utf-8")
+        serialized = snapshot.model_dump_json(indent=2)
+        path.write_text(sanitize_text(serialized, self.sanitize_mapping), encoding="utf-8")
         return path

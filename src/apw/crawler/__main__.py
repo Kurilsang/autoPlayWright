@@ -18,6 +18,7 @@ from apw.crawler.schema import CrawlConfig
 from apw.driver.app_driver import AppDriver
 from apw.engine.registry import default_registry
 from apw.locators.repo import LocatorRepo
+from apw.sanitize import load_mapping
 
 
 def main() -> int:
@@ -49,6 +50,7 @@ def main() -> int:
         env=args.env,
         out_dir=args.out,
         prepare=driver.goto_base,
+        sanitize_mapping=load_mapping(),  # configs/sanitize.local.yaml（真实串仅存本地）
     )
     try:
         for config_path in args.config:

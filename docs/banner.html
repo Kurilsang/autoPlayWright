@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>autoPlayWright · 项目报告</title>
+<style>
+  :root {
+    --bg: #0B1020;
+    --panel: rgba(255,255,255,0.055);
+    --border: rgba(159,176,204,0.22);
+    --text: #EAF0FF;
+    --dim: #9FB0CC;
+    --faint: #64748F;
+    --accent: #5B8CFF;
+    --accent2: #37D6A6;
+    --warn: #FFB454;
+    --danger: #FF6B7A;
+    --violet: #A78BFA;
+    --ease: cubic-bezier(.65, .05, .36, 1);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    background:
+      radial-gradient(1100px 640px at 16% -12%, rgba(91,140,255,0.16), transparent 62%),
+      radial-gradient(950px 640px at 92% 112%, rgba(55,214,166,0.11), transparent 62%),
+      var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- 顶栏 ---------- */
+  .topbar {
+    position: fixed; top: 0; left: 0; right: 0; height: 58px; z-index: 30;
+    display: flex; align-items: center; gap: 18px; padding: 0 28px;
+    background: rgba(11,16,32,0.72); backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(159,176,204,0.14);
+  }
+  .logo { font-size: 17px; font-weight: 800; letter-spacing: 1px; white-space: nowrap; }
+  .logo em { font-style: normal; color: var(--accent2); }
+  .chapters { display: flex; gap: 6px; flex: 1; justify-content: center; flex-wrap: nowrap; overflow: hidden; }
+  .chapters button {
+    font: 650 13px/1 inherit; color: var(--dim); background: transparent;
+    border: 1px solid transparent; border-radius: 999px; padding: 7px 13px;
+    cursor: pointer; white-space: nowrap; transition: all .25s ease;
+  }
+  .chapters button:hover { color: var(--text); background: rgba(255,255,255,0.07); }
+  .chapters button.on { color: var(--text); background: rgba(91,140,255,0.2); border-color: rgba(91,140,255,0.5); }
+  .autoplay-btn {
+    font: 700 13px/1 inherit; color: var(--text); cursor: pointer; white-space: nowrap;
+    background: rgba(255,255,255,0.07); border: 1px solid var(--border);
+    border-radius: 999px; padding: 8px 15px; transition: all .25s ease;
+  }
+  .autoplay-btn:hover { background: rgba(91,140,255,0.25); transform: translateY(-1px); }
+
+  /* ---------- 舞台 + banner 轮播 ---------- */
+  .stage {
+    position: fixed; left: 50%; top: 52px; width: 1600px; height: 912px;
+    transform: translateX(-50%) scale(var(--s, 1)); transform-origin: top center;
+  }
+  .frame {
+    position: relative; width: 1600px; height: 840px; overflow: hidden;
+    border-radius: 28px; border: 1px solid var(--border);
+    box-shadow: 0 40px 90px rgba(0,0,0,0.5);
+  }
+  .track {
+    display: flex; width: 100%; height: 100%;
+    transition: transform .62s var(--ease);
+    will-change: transform;
+  }
+  .banner {
+    position: relative; flex: 0 0 100%; width: 100%; height: 100%;
+    padding: 52px 76px; display: flex; flex-direction: column; overflow: hidden;
+    background:
+      radial-gradient(900px 520px at 12% -10%, rgba(91,140,255,0.16), transparent 60%),
+      radial-gradient(820px 520px at 96% 110%, rgba(55,214,166,0.12), transparent 60%),
+      radial-gradient(700px 460px at 78% 8%, rgba(167,139,250,0.10), transparent 65%),
+      #0C1326;
+  }
+  .banner::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .45;
+    background-image:
+      linear-gradient(rgba(159,176,204,0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(159,176,204,0.05) 1px, transparent 1px);
+    background-size: 56px 56px;
+    -webkit-mask-image: radial-gradient(circle at 50% 42%, rgba(0,0,0,1), transparent 88%);
+    mask-image: radial-gradient(circle at 50% 42%, rgba(0,0,0,1), transparent 88%);
+  }
+  /* 漂浮光球 + 缓慢缩放的氛围动画 */
+  .orb {
+    position: absolute; border-radius: 50%; pointer-events: none;
+    filter: blur(2px); opacity: .55;
+    animation: floaty 8s ease-in-out infinite;
+    transition: transform .8s var(--ease);
+  }
+  .orb.o1 { width: 320px; height: 320px; right: -90px; top: -80px;
+    background: radial-gradient(circle at 32% 30%, rgba(91,140,255,0.34), transparent 68%); }
+  .orb.o2 { width: 260px; height: 260px; left: -70px; bottom: -70px;
+    background: radial-gradient(circle at 60% 60%, rgba(55,214,166,0.26), transparent 68%);
+    animation-duration: 10s; animation-delay: -3s; }
+  .orb.o3 { width: 180px; height: 180px; right: 16%; bottom: 8%;
+    background: radial-gradient(circle at 50% 40%, rgba(167,139,250,0.22), transparent 70%);
+    animation-duration: 12s; animation-delay: -6s; }
+  @keyframes floaty {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-16px) scale(1.04); }
+  }
+
+  /* 元素逐条进场：进入激活 banner 时按 JS 打好的延迟依次浮入 */
+  .banner .r { opacity: 0; transform: translateY(22px); transition: opacity .55s ease, transform .55s var(--ease); }
+  .banner.active .r { opacity: 1; transform: none; }
+  /* 滑动中的相邻 banner 内容轻微视差 */
+  .banner .inner { transition: transform .62s var(--ease); }
+  .banner.active .inner { transform: translateX(0); }
+
+  .head { display: flex; align-items: center; gap: 16px; position: relative; z-index: 2; }
+  .chap {
+    font-size: 17px; font-weight: 700; letter-spacing: 2px; color: var(--accent);
+    border: 1.5px solid rgba(91,140,255,0.5); border-radius: 10px;
+    padding: 5px 13px; background: rgba(91,140,255,0.10); white-space: nowrap;
+  }
+  h1 { font-size: 50px; font-weight: 800; letter-spacing: 1px; line-height: 1.15; }
+  .sub { margin-top: 12px; font-size: 21px; color: var(--dim); line-height: 1.5; max-width: 1320px; position: relative; z-index: 2; }
+  .body { margin-top: 32px; flex: 1; min-height: 0; position: relative; z-index: 2; }
+
+  .banner-note {
+    border-radius: 14px; padding: 16px 22px;
+    font-size: 21px; line-height: 1.5; font-weight: 650;
+    background: rgba(91,140,255,0.12); border: 1px solid rgba(91,140,255,0.4);
+  }
+  .banner-note .hl { color: var(--accent2); }
+  .banner-note .soft { color: var(--dim); font-weight: 500; }
+  .banner-note.danger { background: rgba(255,107,122,0.10); border-color: rgba(255,107,122,0.35); }
+  .banner-note.good { background: rgba(55,214,166,0.10); border-color: rgba(55,214,166,0.35); }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-left: 5px solid var(--accent); border-radius: 14px; padding: 18px 21px;
+  }
+  .card.warn { border-left-color: var(--warn); }
+  .card.bad  { border-left-color: var(--danger); }
+  .card.good { border-left-color: var(--accent2); }
+  .card .t { display: flex; align-items: center; gap: 10px; font-size: 22px; font-weight: 750; line-height: 1.35; }
+  .card .b { margin-top: 8px; font-size: 17.5px; line-height: 1.55; color: var(--dim); }
+  .badge {
+    font-size: 14px; font-weight: 800; padding: 2px 9px; border-radius: 7px;
+    background: rgba(255,255,255,0.06); border: 1px solid var(--border); white-space: nowrap;
+  }
+  .badge.warn { color: var(--warn); } .badge.bad { color: var(--danger); }
+  .badge.good { color: var(--accent2); } .badge.accent { color: var(--accent); }
+
+  ul.bul { list-style: none; display: flex; flex-direction: column; gap: 13px; }
+  ul.bul li { display: flex; gap: 12px; align-items: flex-start; }
+  ul.bul .m { flex: 0 0 22px; text-align: center; font-weight: 800; font-size: 18px; line-height: 1.45; color: var(--accent); }
+  ul.bul .m.good { color: var(--accent2); } ul.bul .m.bad { color: var(--danger); } ul.bul .m.warn { color: var(--warn); }
+  ul.bul .tx { font-size: 20px; font-weight: 650; line-height: 1.5; }
+  ul.bul .sb { margin-top: 2px; font-size: 16px; line-height: 1.5; color: var(--dim); font-weight: 400; }
+
+  .chip {
+    display: inline-block; font-size: 15.5px; font-weight: 650; color: var(--text);
+    background: rgba(255,255,255,0.06); border: 1px solid var(--border);
+    border-radius: 999px; padding: 7px 14px; white-space: nowrap;
+  }
+  .chip.good { border-color: rgba(55,214,166,0.45); }
+  .chip.warn { border-color: rgba(255,180,84,0.45); }
+  .chip.accent { border-color: rgba(91,140,255,0.45); }
+
+  .code {
+    background: rgba(10,16,32,0.78); border: 1px solid var(--border);
+    border-radius: 15px; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+  }
+  .code .bar {
+    display: flex; align-items: center; gap: 8px; padding: 10px 17px;
+    border-bottom: 1px solid var(--border); background: rgba(255,255,255,0.04);
+    font-family: Consolas, "Cascadia Code", monospace; font-size: 15px; color: var(--dim);
+  }
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .code pre {
+    padding: 14px 17px 16px; font-family: Consolas, "Cascadia Code", monospace;
+    font-size: 15px; line-height: 1.58; color: var(--text); white-space: pre-wrap;
+  }
+  .code .k { color: var(--accent); } .code .s { color: var(--accent2); } .code .d { color: var(--faint); }
+
+  .grid2 { display: flex; gap: 20px; }
+  .grid2 > * { flex: 1; min-width: 0; }
+  .col { display: flex; flex-direction: column; gap: 16px; }
+
+  .rail { position: relative; padding-left: 24px; }
+  .rail::before {
+    content: ""; position: absolute; left: 35px; top: 12px; bottom: 12px; width: 3px; border-radius: 2px;
+    background: linear-gradient(180deg, rgba(91,140,255,0.7), rgba(55,214,166,0.5));
+  }
+  .rail .item { display: flex; gap: 19px; align-items: flex-start; margin-bottom: 14px; }
+  .rail .node {
+    flex: 0 0 24px; width: 24px; height: 24px; border-radius: 50%; margin-top: 4px;
+    background: #0C1326; border: 3px solid var(--accent); box-shadow: 0 0 14px rgba(91,140,255,0.35);
+  }
+  .rail .item:nth-child(even) .node { border-color: var(--accent2); }
+  .tag {
+    font-family: Consolas, "Cascadia Code", monospace; font-size: 14px; font-weight: 800;
+    color: var(--accent2); background: rgba(55,214,166,0.10);
+    border: 1px solid rgba(55,214,166,0.35); border-radius: 7px; padding: 2px 9px;
+  }
+  .rail .tt { font-size: 22px; font-weight: 750; line-height: 1.35; }
+  .rail .dd { margin-top: 5px; font-size: 17px; line-height: 1.5; color: var(--dim); max-width: 1280px; }
+
+  .steps { display: flex; align-items: stretch; }
+  .step {
+    flex: 1; min-width: 0; background: var(--panel); border: 1px solid var(--border);
+    border-top: 4px solid var(--accent); border-radius: 15px; padding: 15px 16px 17px;
+  }
+  .step .n {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px; border-radius: 10px; font-size: 17px; font-weight: 800;
+    color: var(--accent); background: rgba(91,140,255,0.18); border: 1.5px solid rgba(91,140,255,0.55);
+  }
+  .step .t { margin-top: 10px; font-size: 21px; font-weight: 750; }
+  .step .b { margin-top: 7px; font-size: 15.5px; line-height: 1.55; color: var(--dim); }
+  .step .h { margin-top: 9px; font-size: 14px; line-height: 1.5; color: var(--accent2); font-family: Consolas, "Cascadia Code", monospace; }
+  .arrow {
+    flex: 0 0 38px; display: flex; align-items: center; justify-content: center;
+    color: var(--accent); font-size: 24px; font-weight: 800; opacity: .85;
+  }
+
+  .panel {
+    background: var(--panel); border: 1px solid var(--border); border-top: 4px solid var(--accent);
+    border-radius: 15px; padding: 16px 20px;
+  }
+  .panel .t { display: flex; align-items: center; gap: 10px; font-size: 22px; font-weight: 800; }
+  .panel .pt {
+    font-family: Consolas, "Cascadia Code", monospace; font-size: 13.5px;
+    border-radius: 7px; padding: 2px 9px; border: 1px solid var(--border); background: rgba(255,255,255,0.05);
+  }
+  .panel ul { list-style: none; margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+  .panel li { display: flex; gap: 8px; font-size: 15.5px; line-height: 1.5; color: var(--dim); }
+  .panel li::before { content: "·"; font-weight: 800; color: inherit; }
+
+  table.chains { width: 100%; border-collapse: collapse; }
+  table.chains th {
+    text-align: left; font-size: 14px; letter-spacing: 2px; color: var(--faint);
+    font-weight: 800; padding: 0 13px 8px; border-bottom: 2px solid var(--border); white-space: nowrap;
+  }
+  table.chains td {
+    padding: 7px 13px; font-size: 16px; line-height: 1.45; color: var(--dim);
+    border-bottom: 1px solid rgba(159,176,204,0.12);
+  }
+  table.chains td.name { font-size: 18px; font-weight: 750; color: var(--text); white-space: nowrap; }
+  table.chains td.est {
+    font-family: Consolas, "Cascadia Code", monospace; font-size: 16px;
+    font-weight: 700; color: var(--accent2); white-space: nowrap;
+  }
+  .pill {
+    display: inline-block; font-size: 13.5px; font-weight: 800; border-radius: 999px;
+    padding: 3px 11px; white-space: nowrap;
+  }
+  .pill.good { color: var(--accent2); background: rgba(55,214,166,0.12); border: 1px solid rgba(55,214,166,0.4); }
+  .pill.todo { color: var(--accent); background: rgba(91,140,255,0.12); border: 1px solid rgba(91,140,255,0.4); }
+
+  /* ---------- 封面 / 收尾 ---------- */
+  .cover { justify-content: center; align-items: center; text-align: center; }
+  .kicker { font-size: 20px; letter-spacing: 5px; color: var(--accent2); font-weight: 700; position: relative; z-index: 2; }
+  .big {
+    margin-top: 20px; font-size: 104px; font-weight: 850; letter-spacing: 2px; line-height: 1.1;
+    background: linear-gradient(92deg, #EAF0FF 20%, #8FB4FF 55%, #37D6A6 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    position: relative; z-index: 2;
+  }
+  .big.small { font-size: 74px; }
+  .cover .mid { margin-top: 16px; font-size: 32px; font-weight: 650; color: var(--dim); letter-spacing: 2px; position: relative; z-index: 2; }
+  .cover .chips { margin-top: 40px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; position: relative; z-index: 2; }
+
+  /* ---------- 轮播控件 ---------- */
+  .nav-arrow {
+    position: absolute; top: 50%; transform: translateY(-50%); z-index: 20;
+    width: 62px; height: 62px; border-radius: 50%; cursor: pointer;
+    background: rgba(12,19,38,0.65); border: 1px solid var(--border); color: var(--text);
+    font-size: 30px; line-height: 1; backdrop-filter: blur(8px);
+    transition: all .28s var(--ease); animation: arrow-in .6s var(--ease) both;
+  }
+  .nav-arrow:hover { background: rgba(91,140,255,0.35); transform: translateY(-50%) scale(1.09); box-shadow: 0 12px 34px rgba(91,140,255,0.35); }
+  .nav-arrow:active { transform: translateY(-50%) scale(0.94); }
+  .nav-arrow.left { left: 26px; }
+  .nav-arrow.right { right: 26px; }
+  .nav-arrow[disabled] { opacity: .25; cursor: default; pointer-events: none; }
+  @keyframes arrow-in { from { opacity: 0; transform: translateY(-50%) scale(.7); } to { opacity: 1; transform: translateY(-50%) scale(1); } }
+
+  .underbar {
+    height: 72px; display: flex; align-items: center; gap: 26px; padding: 18px 12px 0;
+  }
+  .progress-line {
+    flex: 1; height: 5px; border-radius: 3px; background: rgba(159,176,204,0.18); overflow: hidden;
+  }
+  .progress-line i {
+    display: block; height: 100%; width: 0; border-radius: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    transition: width .62s var(--ease);
+  }
+  .ap-track {
+    position: absolute; left: 0; right: 0; top: 0; height: 3px;
+    background: rgba(159,176,204,0.12); overflow: hidden; border-radius: 2px;
+  }
+  .ap-track i {
+    display: block; height: 100%; width: 0;
+    background: linear-gradient(90deg, var(--accent2), var(--accent));
+  }
+  .ap-track i.run { transition: width var(--ap-dur, 9s) linear; width: 100%; }
+  .dots { display: flex; gap: 9px; }
+  .dots span {
+    width: 9px; height: 9px; border-radius: 50%; background: rgba(159,176,204,0.3);
+    cursor: pointer; transition: all .32s var(--ease);
+  }
+  .dots span:hover { background: rgba(159,176,204,0.6); transform: scale(1.25); }
+  .dots span.on { background: var(--accent2); width: 30px; border-radius: 5px; box-shadow: 0 0 14px rgba(55,214,166,0.55); }
+  .counter { font-size: 15px; color: var(--faint); font-family: Consolas, "Cascadia Code", monospace; white-space: nowrap; }
+  .hint { font-size: 13.5px; color: var(--faint); letter-spacing: 1px; white-space: nowrap; }
+
+  /* ---------- 打印 / 导 PDF ---------- */
+  @media print {
+    html, body { overflow: visible; }
+    .topbar, .nav-arrow, .underbar, .ap-track { display: none !important; }
+    .stage { position: static; transform: none; width: auto; height: auto; }
+    .frame { height: auto; overflow: visible; border: 0; box-shadow: none; border-radius: 0; }
+    .track { display: block; }
+    .banner {
+      width: 1600px; height: 840px; page-break-after: always; break-after: page;
+      border: 1px solid var(--border); border-radius: 28px; margin-bottom: 12px;
+    }
+    .banner .r { opacity: 1 !important; transform: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">auto<em>Play</em>Wright <span style="color:var(--faint);font-weight:600">· 项目报告</span></div>
+  <nav class="chapters" id="chapters"></nav>
+  <button class="autoplay-btn" id="autoplayBtn">⏸ 暂停自动播放</button>
+</div>
+
+<div class="stage" id="stage">
+  <div class="frame" id="frame">
+    <div class="ap-track"><i id="apBar"></i></div>
+    <div class="track" id="track">
+
+      <!-- ============ 0. 封面 ============ -->
+      <section class="banner cover" data-title="开场" data-nav="开场">
+        <div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div>
+        <div class="inner">
+          <div class="r kicker">内部 AGENT 产品 · WEB + ELECTRON</div>
+          <div class="r big">autoPlayWright</div>
+          <div class="r mid">UI 自动化测试框架 · 项目报告</div>
+          <div class="r chips">
+            <span class="chip accent">YAML DSL 描述链路</span>
+            <span class="chip good">pytest 解释执行</span>
+            <span class="chip accent">JSON + HTML 报告</span>
+            <span class="chip warn">AI 半自动生成</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 1. 为什么要做 ============ -->
+      <section class="banner" data-title="为什么要做" data-nav="01 为什么">
+        <div class="orb o1"></div><div class="orb o2"></div>
+        <div class="inner">
+          <div class="head">
+            <div class="r chap">01</div>
+            <h1 class="r">为什么要建 autoPlayWright？</h1>
+          </div>
+          <div class="r sub">被测对象是内部 Agent 产品的 Web 端与 Electron 客户端——先看清问题，再谈方案。</div>
+          <div class="body">
+            <div class="grid2">
+              <div class="col">
+                <div class="r card warn">
+                  <div class="t"><span class="badge warn">痛点 1</span>双端产品，页面多、链路多</div>
+                  <div class="b">Web 端 + Electron 客户端，会话创建、对话、工具调用展示、文档处理、工作流……核心链路成体系地增长。</div>
+                </div>
+                <div class="r card bad">
+                  <div class="t"><span class="badge bad">痛点 2</span>核心链路零自动化</div>
+                  <div class="b">完全没有自动化覆盖，版本一到全靠手工回归。成本高、周期长，且不可持续。</div>
+                </div>
+              </div>
+              <div class="col">
+                <div class="r card bad">
+                  <div class="t"><span class="badge bad">痛点 3</span>LLM 回复非确定</div>
+                  <div class="b">Agent 回复由 LLM 生成、措辞每次不同。传统「断言固定文本」的写法会大量假失败，用例写了也不敢信。</div>
+                </div>
+                <div class="r card warn">
+                  <div class="t"><span class="badge warn">痛点 4</span>逐条手写不现实</div>
+                  <div class="b">页面数量大、链路数量多，写用例的速度追不上页面改版的速度，人力线性堆不上去。</div>
+                </div>
+              </div>
+            </div>
+            <div class="r banner-note" style="margin-top:22px">
+              结论：靠人肉回归撑不住，需要一套 <span class="hl">可复用、可判信、可持续维护</span> 的链路自动化资产。
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 2. 能解决什么 ============ -->
+      <section class="banner" data-title="能解决什么" data-nav="02 解决什么">
+        <div class="orb o1"></div><div class="orb o3"></div>
+        <div class="inner">
+          <div class="head">
+            <div class="r chap">02</div>
+            <h1 class="r">它解决什么？</h1>
+          </div>
+          <div class="r sub">一句话：把「逐条写代码」压缩成「写/审一个 YAML」，并且让结果可信、可追溯。</div>
+          <div class="body">
+            <div class="grid2" style="gap:32px">
+              <div style="flex:1.25">
+                <ul class="bul">
+                  <li class="r"><span class="m">▸</span><div><div class="tx">新增用例 ≈ 写/审一个 YAML</div><div class="sb">业务链路用 DSL 描述（导航→输入→发送→断言），不写 Python 代码</div></div></li>
+                  <li class="r"><span class="m">▸</span><div><div class="tx">一次编写，双端执行</div><div class="sb">Web / Electron 共享同一套 Page Object，platforms 字段控制生效矩阵</div></div></li>
+                  <li class="r"><span class="m">▸</span><div><div class="tx">改版不怕：定位器仓库</div><div class="sb">命名定位器多候选回退：testid &gt; role+name &gt; placeholder/label &gt; text &gt; css/xpath</div></div></li>
+                  <li class="r"><span class="m">▸</span><div><div class="tx">断言不抖：只测确定性内容</div><div class="sb">组件 / 状态 / 结构；「完整回答六信号」判完才断言，不再因 LLM 措辞假失败</div></div></li>
+                  <li class="r"><span class="m">▸</span><div><div class="tx">失败即取证，禁止自愈</div><div class="sb">归因分类 + 复现 + 信号时间线 + 冻结截图入报告，缺陷不被重试跑绿</div></div></li>
+                  <li class="r"><span class="m">▸</span><div><div class="tx">结果可消费</div><div class="sb">步骤级 JSON（机器/看板）+ 单文件 HTML 报告（人）+ Allure 可选</div></div></li>
+                  <li class="r"><span class="m">▸</span><div><div class="tx">AI 半自动生成</div><div class="sb">爬虫快照 → LLM 草稿 → 人工评审入库 → CI 稳定回放</div></div></li>
+                </ul>
+              </div>
+              <div style="flex:1">
+                <div class="r code">
+                  <div class="bar">
+                    <span class="dot" style="background:#FF6B7A"></span>
+                    <span class="dot" style="background:#FFB454"></span>
+                    <span class="dot" style="background:#37D6A6"></span>
+                    <span style="margin-left:8px">flows/example_chat.yaml</span>
+                  </div>
+<pre><span class="d">meta: { id: example-chat, platforms: [web], tags: [P0] }</span>
+<span class="k">steps:</span>
+  - do: { page: agent_chat, action: send_message,
+        args: { text: <span class="s">"你好，夹具"</span> } }
+  - do: { page: agent_chat, action: wait_reply_done }
+  - do: { page: agent_chat, action: capture_context }
+  <span class="k">- assert:</span> { type: visible, target: message_list }
+  <span class="k">- assert:</span> { type: text_contains,
+        target: message_list, expected: <span class="s">"你好，夹具"</span> }
+  <span class="d">- judge: { note: "v1 预留" }</span></pre>
+                </div>
+                <div class="r card good" style="margin-top:14px">
+                  <div class="t"><span class="badge good">闭环</span>生产闭环</div>
+                  <div class="b">写 YAML → schema 校验 → pytest 解释执行 → JSON/HTML 报告 → 失败取证回流修复。</div>
+                </div>
+                <div class="r" style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap">
+                  <span class="chip accent">JSON 第一公民</span>
+                  <span class="chip good">report.html 零依赖</span>
+                  <span class="chip">Allure 可选</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 3. 不能解决什么 ============ -->
+      <section class="banner" data-title="不能解决什么" data-nav="03 不解决什么">
+        <div class="orb o1"></div><div class="orb o2"></div>
+        <div class="inner">
+          <div class="head">
+            <div class="r chap">03</div>
+            <h1 class="r">它明确不解决什么</h1>
+          </div>
+          <div class="r sub">边界先说清楚——这些都写进了 SPEC 的 Out of Scope，不承诺、不兜底。</div>
+          <div class="body">
+            <div class="grid2" style="gap:40px">
+              <ul class="bul" style="gap:19px">
+                <li class="r"><span class="m bad">✕</span><div><div class="tx">LLM-as-Judge 的判定实现</div><div class="sb">只预留 schema 字段与接口形状，判定逻辑后置接入</div></div></li>
+                <li class="r"><span class="m bad">✕</span><div><div class="tx">全自动探索式测试</div><div class="sb">AI 不自主漫游页面；生成物必须人工评审后才入库（D2/D10）</div></div></li>
+                <li class="r"><span class="m bad">✕</span><div><div class="tx">后端接口测试 / 造数、性能压测</div><div class="sb">只测 UI 的外部行为，接口与性能各有专门手段</div></div></li>
+                <li class="r"><span class="m bad">✕</span><div><div class="tx">视觉像素级回归、移动端</div><div class="sb">覆盖目标是 Web + Electron 两端，不做像素比对</div></div></li>
+              </ul>
+              <ul class="bul" style="gap:19px">
+                <li class="r"><span class="m bad">✕</span><div><div class="tx">mock LLM 后端</div><div class="sb">Agent 产品必须测真实链路，mock 出来的绿灯没有意义</div></div></li>
+                <li class="r"><span class="m bad">✕</span><div><div class="tx">测试平台 / 看板本体</div><div class="sb">框架只负责输出标准 JSON，消费端交给内部平台</div></div></li>
+                <li class="r"><span class="m bad">✕</span><div><div class="tx">手工用例 ↔ 自动化用例的管理映射系统</div><div class="sb">不做用例管理平台，用例即仓库里的 YAML 文件</div></div></li>
+              </ul>
+            </div>
+            <div class="r banner-note danger" style="margin-top:26px">
+              定位：链路回归资产，不是测试体系的全部。
+              <span class="soft">只做「确定性、可复用、可判信」的那一层，其余交给对应领域的专门工具。</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 4. 为什么不做全量 ============ -->
+      <section class="banner" data-title="为什么不做全量" data-nav="04 不做全量">
+        <div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div>
+        <div class="inner">
+          <div class="head">
+            <div class="r chap">04</div>
+            <h1 class="r">为什么不做全量覆盖？</h1>
+          </div>
+          <div class="r sub">不是能力问题，是性价比问题：全量在高频改版 + LLM 限流的现实里跑不动、也守不住。</div>
+          <div class="body">
+            <div class="grid2" style="gap:18px">
+              <div class="r card warn">
+                <div class="t"><span class="badge warn">成本</span>UI 高频改版</div>
+                <div class="b">页面一改，全量用例成片变红，维护成本超过回归收益。D11 的判断：靠数量堆不出稳定。</div>
+              </div>
+              <div class="r card bad">
+                <div class="t"><span class="badge bad">限流</span>后端 LLM 限流是硬约束</div>
+                <div class="b">3~5 并发即触发限流，xdist 并行度被锁死（默认 3、硬上限 5）。用例越多，全量跑得越久。</div>
+              </div>
+              <div class="r card bad">
+                <div class="t"><span class="badge bad">噪声</span>假失败有毒</div>
+                <div class="b">LLM 非确定 + 半截渲染，海量断言 = 海量噪声。红了没人看，用例就废了。</div>
+              </div>
+            </div>
+            <div class="r" style="margin-top:20px; display:flex; align-items:center; gap:15px">
+              <div style="font-size:18px; font-weight:800; color:var(--accent2); letter-spacing:2px">对策（D11 定稿）</div>
+              <div style="flex:1; height:2px; background:rgba(159,176,204,0.25)"></div>
+            </div>
+            <div class="grid2" style="gap:18px; margin-top:14px">
+              <div class="r card good">
+                <div class="t">定位器多候选回退</div>
+                <div class="b">testid &gt; role+name &gt; placeholder/label &gt; text &gt; css/xpath，改版只修定位器仓库。</div>
+              </div>
+              <div class="r card good">
+                <div class="t">断言只打稳定结构标记</div>
+                <div class="b">组件 / 状态 / 结构，不碰 LLM 措辞；基础原语必须以 assert 收口。</div>
+              </div>
+              <div class="r card good">
+                <div class="t">用例总量控制</div>
+                <div class="b">v1 只做 20~50 条核心链路，按 P0/P1 分级，冒烟与全量分开跑。</div>
+              </div>
+            </div>
+            <div class="r banner-note good" style="margin-top:20px">
+              原则：只测外部行为——<span class="hl">核心链路先绿、且持续可信，比用例数量更重要。</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 5. 之后的打算 ============ -->
+      <section class="banner" data-title="之后的打算" data-nav="05 之后打算">
+        <div class="orb o1"></div><div class="orb o2"></div>
+        <div class="inner">
+          <div class="head">
+            <div class="r chap">05</div>
+            <h1 class="r">之后的打算</h1>
+          </div>
+          <div class="r sub">顺序已排定：先把稳定性和门禁收口，再上生成器，最后才是影响分析与判定。</div>
+          <div class="body">
+            <div class="rail">
+              <div class="r item">
+                <div class="node"></div>
+                <div><div><span class="tag">近期</span> <span class="tt">评审 P1/P2 收口</span></div>
+                <div class="dd">auth 加固、裸 selector 机械门禁、失败 trace 留存、xdist 并行（≤5，超限拒绝启动）、429 退避重试。</div></div>
+              </div>
+              <div class="r item">
+                <div class="node"></div>
+                <div><div><span class="tag">票 04</span> <span class="tt">动作原语库</span></div>
+                <div class="dd">两档制落地：语义原语（含完成判定/取证）+ 基础原语；基础原语必须以 assert 收口，收集期静态检查。</div></div>
+              </div>
+              <div class="r item">
+                <div class="node"></div>
+                <div><div><span class="tag">票 07</span> <span class="tt">AI 生成器（opencode skill）</span></div>
+                <div class="dd">快照 + 业务描述 → flow 草稿 diff，人工评审入库；失败修复也走 diff 流，AI 只修资产、不改现场。</div></div>
+              </div>
+              <div class="r item">
+                <div class="node"></div>
+                <div><div><span class="tag">票 08</span> <span class="tt">快照 diff 影响分析</span></div>
+                <div class="dd">页面改版后重爬比对，输出受影响的定位器 / 页面 / flow 清单——直接圈定「这次要修哪些用例」。</div></div>
+              </div>
+              <div class="r item">
+                <div class="node"></div>
+                <div><div><span class="tag">扩量</span> <span class="tt">核心链路 20~50 条</span></div>
+                <div class="dd">多轮上下文漂移链路优先；远期接入 LLM-as-Judge（只评结构化维度，措辞评分走旁路不挡门禁）。</div></div>
+              </div>
+            </div>
+            <div class="r" style="margin-top:18px; display:flex; align-items:center; gap:12px; flex-wrap:wrap">
+              <div style="font-size:16px; font-weight:800; color:var(--faint)">里程碑</div>
+              <span class="chip good">M0 骨架 ✓</span>
+              <span class="chip">→</span>
+              <span class="chip">M1 核心链路覆盖</span>
+              <span class="chip">→</span>
+              <span class="chip">M2 AI 生成流水线</span>
+              <span class="chip">→</span>
+              <span class="chip">M3 diff / Judge</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 6. 团队协作 ============ -->
+      <section class="banner" data-title="如何协作" data-nav="06 如何协作">
+        <div class="orb o1"></div><div class="orb o3"></div>
+        <div class="inner">
+          <div class="head">
+            <div class="r chap">06</div>
+            <h1 class="r">团队怎么协作：新增一条核心链路</h1>
+          </div>
+          <div class="r sub">固定五步走，人人（含 AI）走同一条路；评审与验收门是唯一入库通道。</div>
+          <div class="body">
+            <div class="steps">
+              <div class="r step">
+                <div class="n">1</div>
+                <div class="t">探页面</div>
+                <div class="b">写 configs/crawl/&lt;page&gt;_probe.yaml，探查原语推进状态 + dump_dom，产出页面状态快照。</div>
+                <div class="h">python -m apw.crawler</div>
+              </div>
+              <div class="r arrow">→</div>
+              <div class="r step">
+                <div class="n">2</div>
+                <div class="t">补定位器</div>
+                <div class="b">locators/&lt;page&gt;.yaml：候选按优先级书写，来源标 manual / ai，禁止散落裸 selector。</div>
+                <div class="h">testid &gt; role+name &gt; …</div>
+              </div>
+              <div class="r arrow">→</div>
+              <div class="r step">
+                <div class="n">3</div>
+                <div class="t">补页面对象</div>
+                <div class="b">src/apw/pages/&lt;page&gt;.py：动作 = 语义原语（完成判定 + 失败取证），注册进 default_registry()。</div>
+                <div class="h">engine/registry.py</div>
+              </div>
+              <div class="r arrow">→</div>
+              <div class="r step">
+                <div class="n">4</div>
+                <div class="t">写 flow</div>
+                <div class="b">flows/&lt;case&gt;.yaml：do / assert / judge，只断言确定性内容；LLM 产出只进 capture_context 证据。</div>
+                <div class="h">同页面新链路从这步起</div>
+              </div>
+              <div class="r arrow">→</div>
+              <div class="r step">
+                <div class="n">5</div>
+                <div class="t">过验收门</div>
+                <div class="b">收集期 schema 校验 + ruff check + 真实环境绿跑 ≥3 次（防偶发卡死污染结论），绿了才合入。</div>
+                <div class="h">D15 验收门</div>
+              </div>
+            </div>
+            <div class="r" style="margin-top:24px; display:flex; align-items:center; gap:15px">
+              <div style="font-size:18px; font-weight:800; color:var(--warn); letter-spacing:1px">硬约束（人人适用）</div>
+              <div style="flex:1; height:2px; background:rgba(159,176,204,0.25)"></div>
+            </div>
+            <div class="r" style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap">
+              <span class="chip warn">凭据与内网信息永不入库</span>
+              <span class="chip warn">失败即取证，禁止自愈</span>
+              <span class="chip warn">页面元素一律走定位器仓库</span>
+              <span class="chip warn">引擎不 import pytest / allure</span>
+              <span class="chip warn">并发 worker ≤ 5（限流）</span>
+              <span class="chip warn">commit：feat/fix + 一句话要点</span>
+            </div>
+            <div class="r" style="margin-top:18px; font-size:16.5px; line-height:1.55; color:var(--dim)">
+              AI 的权限边界（D10）：只修资产、不改现场——失败后产出修复 diff 人工审合入；探索区临时脚本用完归档
+              <span style="color:var(--accent)">.scratch/</span> 当生成器素材，升格需人工判定。
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 7. 交付成果 ============ -->
+      <section class="banner" data-title="交付成果" data-nav="07 交付成果">
+        <div class="orb o1"></div><div class="orb o2"></div>
+        <div class="inner">
+          <div class="head">
+            <div class="r chap">07</div>
+            <h1 class="r">交付成果长什么样</h1>
+          </div>
+          <div class="r sub">代码、用例、报告、生成侧资产与门禁——四块都已落库，可持续演进。</div>
+          <div class="body">
+            <div class="grid2" style="gap:18px">
+              <div class="r panel" style="border-top-color:var(--accent)">
+                <div class="t">框架本体 <span class="pt" style="color:var(--accent)">src/apw</span></div>
+                <ul>
+                  <li>dsl：pydantic schema，收集期校验非法 DSL</li>
+                  <li>engine：FlowRunner → StepEvent 事件流</li>
+                  <li>pages + locators：语义原语 + 定位器仓库</li>
+                  <li>driver：Web / Electron 统一输出 Page</li>
+                  <li>reporter：JSON → report.html；pytest 插件 + crawler + sanitize</li>
+                </ul>
+              </div>
+              <div class="r panel" style="border-top-color:var(--accent2)">
+                <div class="t">业务用例 <span class="pt" style="color:var(--accent2)">flows/</span></div>
+                <ul>
+                  <li>7 条链路入库：会话冒烟、示例、对话并行切换</li>
+                  <li>工作流 4 条：手写保存运行 / AI 生成运行</li>
+                  <li>并发 2 个 AI 生成任务 / 并发 2 个 AI 运行任务</li>
+                  <li>并发 UI 逐标签身份核对，串台/卡死判 fail</li>
+                  <li>真实环境 3 次绿跑，冒烟持续绿灯</li>
+                </ul>
+              </div>
+            </div>
+            <div class="grid2" style="gap:18px; margin-top:18px">
+              <div class="r panel" style="border-top-color:var(--violet)">
+                <div class="t">运行产物 <span class="pt" style="color:var(--violet)">reports/</span></div>
+                <ul>
+                  <li>flow 级 JSON：输入/输出/断言明细/耗时/截图</li>
+                  <li>run 汇总：三态 passed/failed/skipped + 跳过原因</li>
+                  <li>report.html：单文件零依赖，会话结束自动渲染</li>
+                  <li>capture_context：用户输入/推理/思考/最终答案</li>
+                  <li>失败含取证包：归因 + 复现 + 信号时间线 + 冻结截图</li>
+                </ul>
+              </div>
+              <div class="r panel" style="border-top-color:var(--warn)">
+                <div class="t">生成侧资产与门禁 <span class="pt" style="color:var(--warn)">crawler + tests</span></div>
+                <ul>
+                  <li>状态化爬虫 + page: probe 探查原语</li>
+                  <li>快照骨架：状态路径标注 + 定位器候选</li>
+                  <li>落盘自动脱敏：映射表 + 通用模式兜底</li>
+                  <li>tests 全绿；tests/test_no_secrets.py 红线门禁</li>
+                  <li>文档：docs/SPEC.md（22 条决策记录）+ AGENTS.md</li>
+                </ul>
+              </div>
+            </div>
+            <div class="r banner-note" style="margin-top:18px">
+              最小可交付形态：新增一条核心链路 <span class="hl">≈ 写/审一个 YAML 文件</span>——这就是 README 里承诺的生产闭环。
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 7+. 核心链路清单与搭建时间 ============ -->
+      <section class="banner" data-title="核心链路" data-nav="07+ 核心链路">
+        <div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div>
+        <div class="inner">
+          <div class="head">
+            <div class="r chap">07+</div>
+            <h1 class="r">落地成果：核心链路清单与搭建时间</h1>
+          </div>
+          <div class="r sub">已确定 9 条核心链路；工时按五步走全流程（探查→定位器→页面对象→flow→验收门绿跑 ≥3 次）估算，对话 / 工作流已有资产。</div>
+          <div class="body">
+            <table class="r chains">
+              <thead>
+                <tr><th style="width:170px">核心链路</th><th style="width:92px">现状</th><th style="width:126px">预估工时</th><th>搭建要点</th></tr>
+              </thead>
+              <tbody>
+                <tr><td class="name">对话</td><td><span class="pill good">已落地</span></td><td class="est">+0.5~1 天/条</td><td>AmlChatPage +「完整回答六信号」已绿；补多轮上下文 / 历史恢复分支</td></tr>
+                <tr><td class="name">多对话并行切换</td><td><span class="pill good">已落地</span></td><td class="est">+1~2 天/条</td><td>复用并发「逐标签身份核对」模式；串台 / 卡死判 fail 并冻结取证</td></tr>
+                <tr><td class="name">工作流</td><td><span class="pill good">已落地</span></td><td class="est">+0.5~1 天/条</td><td>已有 4 条链路：手写保存运行 / AI 生成运行 / 并发生成 / 并发运行</td></tr>
+                <tr><td class="name">多工作流并行切换</td><td><span class="pill good">已落地</span></td><td class="est">+1 天/条</td><td>并发 2 路已覆盖；补交叉切换、标签隔离与中断恢复场景</td></tr>
+                <tr><td class="name">套组（智能体）安装</td><td><span class="pill todo">待建</span></td><td class="est">1.5~2 天</td><td>新页面 + 弹窗确认 + 安装完成信号判定</td></tr>
+                <tr><td class="name">skill 安装</td><td><span class="pill todo">待建</span></td><td class="est">1~1.5 天</td><td>安装列表 / 状态流转断言，复用安装类动作原语</td></tr>
+                <tr><td class="name">报告样式库</td><td><span class="pill todo">待建</span></td><td class="est">1~1.5 天</td><td>列表 + 编辑器控件；断言样式切换后的确定性结构状态</td></tr>
+                <tr><td class="name">操练场</td><td><span class="pill todo">待建</span></td><td class="est">2~2.5 天</td><td>交互密集、状态多，探查快照与状态路径标注工作量最大</td></tr>
+                <tr><td class="name">长任务配置</td><td><span class="pill todo">待建</span></td><td class="est">2.5~3 天</td><td>长时等待 / 取消 / 超时路径；完成判定与失败取证最复杂</td></tr>
+              </tbody>
+            </table>
+            <div class="r banner-note good" style="margin-top:16px">
+              合计 ≈ <span class="hl">12~15 人天</span>（单人约 3 周）：待建 6 项约 9~12 人天 + 已落地链路增补 2~3 人天；
+              每条链路先落 1~2 条用例（P0 冒烟 + P1 分支），票 08 快照 diff 落地后改版维护成本可再降。
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 8. 收尾 ============ -->
+      <section class="banner cover" data-title="收尾" data-nav="收尾">
+        <div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div>
+        <div class="inner">
+          <div class="r big small">autoPlayWright</div>
+          <div class="r mid" style="margin-top:20px; font-size:30px; font-weight:700; color:var(--text); letter-spacing:0">
+            核心生产闭环：新增用例 ≈ 写/审一个 YAML
+          </div>
+          <div class="r chips">
+            <span class="chip good">只断言确定性内容</span>
+            <span class="chip warn">失败即取证，禁止自愈</span>
+            <span class="chip accent">AI 半自动 + 人工把关</span>
+          </div>
+          <div class="r" style="margin-top:46px; font-size:24px; color:var(--dim); letter-spacing:4px">谢谢 · Q&amp;A</div>
+        </div>
+      </section>
+
+    </div>
+    <button class="nav-arrow left" id="prevBtn" title="上一页">‹</button>
+    <button class="nav-arrow right" id="nextBtn" title="下一页">›</button>
+  </div>
+
+  <div class="underbar">
+    <div class="progress-line"><i id="progressFill"></i></div>
+    <div class="dots" id="dots"></div>
+    <div class="counter" id="counter">1 / 10</div>
+    <div class="hint">← → 切换 · 空格 自动播放 · F 全屏</div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var banners = Array.prototype.slice.call(document.querySelectorAll('.banner'));
+  var total = banners.length;
+  var current = -1;
+  var track = document.getElementById('track');
+  var dotsEl = document.getElementById('dots');
+  var chaptersEl = document.getElementById('chapters');
+  var counterEl = document.getElementById('counter');
+  var progressFill = document.getElementById('progressFill');
+  var apBar = document.getElementById('apBar');
+  var autoplayBtn = document.getElementById('autoplayBtn');
+  var frame = document.getElementById('frame');
+
+  var AUTOPLAY_MS = 9000;
+  var autoplay = true;
+  var apTimer = null;
+
+  // 每个 banner 内 .r 元素按顺序打入场延迟
+  banners.forEach(function (b) {
+    var items = b.querySelectorAll('.r');
+    Array.prototype.forEach.call(items, function (el, i) {
+      el.style.transitionDelay = (0.12 + i * 0.07).toFixed(2) + 's';
+    });
+  });
+
+  // 圆点 + 顶部章节导航（自动生成）
+  banners.forEach(function (b, i) {
+    var dot = document.createElement('span');
+    dot.title = b.getAttribute('data-title') || '';
+    dot.addEventListener('click', function () { go(i, true); });
+    dotsEl.appendChild(dot);
+
+    var chip = document.createElement('button');
+    chip.textContent = b.getAttribute('data-nav') || b.getAttribute('data-title') || '';
+    chip.addEventListener('click', function () { go(i, true); });
+    chaptersEl.appendChild(chip);
+  });
+  var dots = Array.prototype.slice.call(dotsEl.children);
+  var chips = Array.prototype.slice.call(chaptersEl.children);
+
+  function go(i, manual) {
+    if (i < 0 || i >= total || i === current) return;
+    current = i;
+    track.style.transform = 'translateX(-' + i * 100 + '%)';
+    banners.forEach(function (b, idx) { b.classList.toggle('active', idx === i); });
+    dots.forEach(function (d, idx) { d.classList.toggle('on', idx === i); });
+    chips.forEach(function (c, idx) { c.classList.toggle('on', idx === i); });
+    counterEl.textContent = (i + 1) + ' / ' + total;
+    progressFill.style.width = ((i + 1) / total * 100) + '%';
+    if (history.replaceState) history.replaceState(null, '', '#/' + (i + 1));
+    if (manual) restartAutoplay();
+    document.getElementById('prevBtn').disabled = (i === 0);
+    document.getElementById('nextBtn').disabled = (i === total - 1);
+  }
+
+  function next() { go(current + 1 < total ? current + 1 : (autoplay ? 0 : current), true); }
+  function prev() { go(current - 1 >= 0 ? current - 1 : (autoplay ? total - 1 : current), true); }
+
+  // ---- 自动播放（悬停暂停；顶部细进度条提示节奏）----
+  function restartAutoplay() {
+    clearTimeout(apTimer);
+    apBar.classList.remove('run');
+    apBar.style.width = '0';
+    if (!autoplay) return;
+    void apBar.offsetWidth;           // 强制重排，重置进度条动画
+    apBar.classList.add('run');
+    apTimer = setTimeout(function () {
+      go((current + 1) % total, false);
+      restartAutoplay();
+    }, AUTOPLAY_MS);
+  }
+  function setAutoplay(on) {
+    autoplay = on;
+    autoplayBtn.textContent = on ? '⏸ 暂停自动播放' : '▶ 开始自动播放';
+    restartAutoplay();
+  }
+  autoplayBtn.addEventListener('click', function () { setAutoplay(!autoplay); });
+  frame.addEventListener('mouseenter', function () {
+    clearTimeout(apTimer); apBar.classList.remove('run');
+  });
+  frame.addEventListener('mouseleave', function () { restartAutoplay(); });
+
+  document.getElementById('nextBtn').addEventListener('click', next);
+  document.getElementById('prevBtn').addEventListener('click', prev);
+
+  document.addEventListener('keydown', function (e) {
+    switch (e.key) {
+      case 'ArrowRight': case 'PageDown': e.preventDefault(); next(); break;
+      case 'ArrowLeft': case 'PageUp': e.preventDefault(); prev(); break;
+      case ' ': e.preventDefault(); setAutoplay(!autoplay); break;
+      case 'Home': e.preventDefault(); go(0, true); break;
+      case 'End': e.preventDefault(); go(total - 1, true); break;
+      case 'f': case 'F':
+        if (document.fullscreenElement) document.exitFullscreen();
+        else document.documentElement.requestFullscreen && document.documentElement.requestFullscreen();
+        break;
+    }
+  });
+
+  // 触屏左右滑动
+  var startX = null;
+  document.addEventListener('touchstart', function (e) { startX = e.touches[0].clientX; });
+  document.addEventListener('touchend', function (e) {
+    if (startX === null) return;
+    var dx = e.changedTouches[0].clientX - startX;
+    if (Math.abs(dx) > 50) (dx < 0 ? next : prev)();
+    startX = null;
+  });
+
+  // 舞台等比缩放适配窗口
+  function fit() {
+    var s = Math.min(window.innerWidth / 1600, (window.innerHeight - 70) / 912);
+    document.getElementById('stage').style.setProperty('--s', Math.max(s, 0.2));
+  }
+  window.addEventListener('resize', fit);
+  fit();
+
+  // 支持 #/N 直接定位
+  var m = location.hash.match(/^#\/(\d+)$/);
+  var start = m ? Math.min(Math.max(parseInt(m[1], 10) - 1, 0), total - 1) : 0;
+  go(start, false);
+  restartAutoplay();
+
+  // ---- 布局自检（仅 ?check=1；供无头浏览器文本验收，正常浏览不触发）----
+  if (location.search.indexOf('check=1') >= 0) {
+    document.documentElement.className += ' check';
+    var st = document.createElement('style');
+    st.textContent = '.check .banner .r{opacity:1 !important;transform:none !important;}';
+    document.head.appendChild(st);
+    var problems = [];
+    banners.forEach(function (b, idx) {
+      var sr = b.getBoundingClientRect();
+      var scale = sr.width / 1600;
+      var limitBottom = sr.bottom - 40 * scale;
+      var limitRight = sr.right - 50 * scale;
+      Array.prototype.forEach.call(b.querySelectorAll('*'), function (el) {
+        if (el.className && ('' + el.className).indexOf('orb') >= 0) return;
+        var r = el.getBoundingClientRect();
+        if (r.width === 0 && r.height === 0) return;
+        if (r.bottom > limitBottom + 2 || r.right > limitRight + 2 || r.left < sr.left - 2) {
+          problems.push('p' + (idx + 1) + ' [' + (el.className || el.tagName) + '] bottom=' +
+            Math.round(r.bottom - sr.top) + ' right=' + Math.round(r.right - sr.left));
+        }
+      });
+    });
+    var pre = document.createElement('pre');
+    pre.id = 'check-result';
+    pre.textContent = problems.length ? problems.join('\n') : 'ALL-SLIDES-FIT';
+    document.body.appendChild(pre);
+  }
+})();
+</script>
+
+</body>
+</html>

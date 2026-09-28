@@ -40,7 +40,7 @@ Python 3.11+ / Playwright（同步 API）/ pytest 9（pytest11 插件入口）/ 
 - `configs/envs/*.yaml` — 环境配置（`--apw-env` 选择；fixture=本地夹具站点）
 - `configs/crawl/*.yaml` — 爬取配置（状态路径 + 完成信号探针，喂生成器）
 - `scripts/` — 生成侧工具脚本（快照摘要等，AI 复用）
-- `reports/` — 运行产物（gitignored；`report.html` 会话结束自动渲染）；`docs/SPEC.md` — 规格与决策记录
+- `reports/` — 运行产物（gitignored；`report.html` 会话结束自动渲染）；`docs/SPEC.md` — 规格与决策记录；`docs/banner-light.html` — 项目报告页（banner 轮播，`run_slides.bat` 打开）
 - `.scratch/autoPlayWright/issues/` — 主建任务票（01~08，依赖序）；`.scratch/review-p0/` — 评审修复批（spec + 票 + P1/P2 backlog）；完成即勾验收框并标 done
 - commit 格式：`feat/fix: 一句话` + `- 要点`，极简
 

@@ -1,0 +1,38 @@
+# 对话并行切换用例（多对话并行切换链路）：双会话并行生成，来回切换逐会话身份核对。
+# 复用工作流并发的「逐标签身份核对」模式改为会话维度；串台/卡死判 fail 冻结取证。
+# 身份锚点 = 会话 URL（send_message 时记录，switch_session 精确对号）；
+# 断言全部为确定性内容（输入回显/组件渲染），不断言 LLM 措辞。
+meta:
+  id: chat-concurrent-switch
+  name: 对话并行切换：双会话并行生成并来回切换身份核对
+  platforms: [web]
+  envs: [test]
+  tags: [P0, chat, concurrent]
+  owner: qa
+steps:
+  - do: { page: aml_chat, action: select_agent_mode, args: { mode: "专家模式", timeout_ms: 3000 } }
+  - do: { page: aml_chat, action: dismiss_onboarding, args: {} }
+  # ---- 会话 A：新建并发送特征标记 ----
+  - do: { page: aml_chat, action: new_session, args: {} }
+  - do: { page: aml_chat, action: select_agent_mode, args: { mode: "专家模式", timeout_ms: 30000 } }
+  - do: { page: aml_chat, action: send_message, args: { text: "并行切换用例A 甲甲甲 111", tag: "A" } }
+  # ---- 会话 B：A 未完成即新建 B 并发送（双会话并行生成中）----
+  - do: { page: aml_chat, action: new_session, args: {} }
+  - do: { page: aml_chat, action: select_agent_mode, args: { mode: "专家模式", timeout_ms: 30000 } }
+  - do: { page: aml_chat, action: send_message, args: { text: "并行切换用例B 乙乙乙 222", tag: "B" } }
+  # ---- 切回 A：身份核对（串台判 fail 取证）→ 等 A 完整回答 ----
+  - do: { page: aml_chat, action: switch_session, args: { tag: "A", title: "并行切换用例A", expect_text: "并行切换用例A 甲甲甲 111", forbid_text: "并行切换用例B", timeout_ms: 30000 } }
+  - do: { page: aml_chat, action: wait_reply_done, args: { timeout_ms: 180000 } }
+  - do: { page: aml_chat, action: capture_context, args: {} }
+  - assert: { type: visible, page: aml_chat, target: user_message }
+  - assert: { type: text_contains, page: aml_chat, target: user_message, expected: "并行切换用例A 甲甲甲 111" }
+  # ---- 切到 B：身份核对 → 等 B 完整回答 ----
+  - do: { page: aml_chat, action: switch_session, args: { tag: "B", title: "并行切换用例B", expect_text: "并行切换用例B 乙乙乙 222", forbid_text: "并行切换用例A", timeout_ms: 30000 } }
+  - do: { page: aml_chat, action: wait_reply_done, args: { timeout_ms: 180000 } }
+  - do: { page: aml_chat, action: capture_context, args: {} }
+  - assert: { type: visible, page: aml_chat, target: user_message }
+  - assert: { type: text_contains, page: aml_chat, target: user_message, expected: "并行切换用例B 乙乙乙 222" }
+  # ---- 再切回 A：交叉切换复核（上下文不丢、不串台）----
+  - do: { page: aml_chat, action: switch_session, args: { tag: "A", title: "并行切换用例A", expect_text: "并行切换用例A 甲甲甲 111", forbid_text: "并行切换用例B", timeout_ms: 30000 } }
+  - assert: { type: text_contains, page: aml_chat, target: user_message, expected: "并行切换用例A 甲甲甲 111" }
+  - judge: { note: "v1 预留：回复内容质量由 LLM-as-Judge 判定" }

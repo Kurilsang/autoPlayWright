@@ -1,0 +1,46 @@
+# 对话并行切换首轮探查配置（生成侧资产）：发现多会话的创建/列表/切换 UI 结构。
+# 探查期用 probe 保留名的通用原语推进状态；页面对象产品化后把 probe 步骤
+# 替换为 page: aml_chat 的动作（参考 configs/crawl/aml_chat.yaml）。
+# 产物落 .scratch/autoPlayWright/snapshots/<env>/（gitignored，落盘自动脱敏）。
+name: chat-parallel-probe
+targets:
+  - id: chat-parallel
+    route: /chat
+    steps:
+      # 真实环境常见拦截层（延迟弹窗/新手引导），先幂等清掉
+      - do: { page: aml_chat, action: select_agent_mode, args: { mode: "专家模式", timeout_ms: 3000 } }
+        label: load_popups_dismissed
+      - do: { page: aml_chat, action: dismiss_onboarding, args: {} }
+        label: popups_dismissed
+        capture: true
+      # ---- 会话 A：新建并发送特征标记 ----
+      - do: { page: aml_chat, action: new_session, args: {} }
+        label: new_session_a
+      - do: { page: aml_chat, action: select_agent_mode, args: { mode: "专家模式", timeout_ms: 30000 } }
+        label: mode_a
+      - do: { page: aml_chat, action: send_message, args: { text: "并行探查A 甲甲甲 111" } }
+        label: sent_a
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "parallel_a_sent" } }
+        label: dom_a_sent
+      # ---- 会话 B：新建并发送不同特征标记 ----
+      - do: { page: aml_chat, action: new_session, args: {} }
+        label: new_session_b
+      - do: { page: aml_chat, action: select_agent_mode, args: { mode: "专家模式", timeout_ms: 30000 } }
+        label: mode_b
+      - do: { page: aml_chat, action: send_message, args: { text: "并行探查B 乙乙乙 222" } }
+        label: sent_b
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "parallel_b_sent" } }
+        label: dom_b_sent
+      # ---- 尝试切回会话 A（多假设试错：侧边栏会话标题文本，未命中静默跳过）----
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "并行探查A", exact: false }, optional: true, timeout_ms: 5000 } }
+        label: switch_a_by_title
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "after_switch_a" } }
+        label: dom_after_switch_a
+    signals:
+      - name: stop_button
+        selector: { by: text, value: 停止 }
+      - name: history_loading
+        selector: { by: text, value: 加载对话历史中, exact: false }

@@ -61,3 +61,15 @@ locators:
     source: manual
     candidates:
       - { by: text, value: "重新回答" }                   # 完成态操作行（复制/喜欢/重新回答）
+  # ---- 多会话并行切换（2026-09-28 chat-parallel 探查）----
+  - name: session_row
+    source: manual
+    candidates:
+      # 侧边栏会话行容器；按标题 filter(has_text=标题) 定位到行（标题=首条消息文本，异步生效）
+      - { by: css, value: "aside div.relative.group.cursor-pointer" }
+      - { by: css, value: "div.relative.group.cursor-pointer" }
+  - name: session_header_title
+    source: manual
+    candidates:
+      # 顶栏当前会话名（title 属性=会话标题），切换后身份核对锚点
+      - { by: css, value: "div.min-w-0.truncate[title]" }

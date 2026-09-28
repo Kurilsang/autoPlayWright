@@ -68,6 +68,21 @@ class BasePage:
     def loc(self, name: str) -> Locator:
         return self.repo.resolve(self.page, self.page_name, name)
 
+    @property
+    def flow_state(self) -> dict:
+        """流程级共享状态：页面对象每步新建，但同一流程共享同一个 Playwright Page。
+
+        用于跨步骤传递确定性锚点（如会话 URL），状态随流程结束自然消亡。
+        """
+        store = getattr(self.page, "_apw_flow_state", None)
+        if store is None:
+            store = {}
+            try:
+                self.page._apw_flow_state = store
+            except Exception:  # noqa: BLE001 - 不可写对象退化为独立状态
+                pass
+        return store
+
     def count(self, name: str) -> int:
         """软计数：元素不存在返回 0 而非抛错（用于完成信号等预期缺席的探测）。
 

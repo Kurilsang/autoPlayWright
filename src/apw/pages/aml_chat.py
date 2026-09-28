@@ -82,6 +82,12 @@ _CAPTURE_JS = """
 """
 
 
+def _session_id(url: str) -> str:
+    """从会话 URL（/chat/<uuid>）取会话 id，作切换前后身份对号锚点。"""
+    path = url.split("?", 1)[0].split("#", 1)[0].rstrip("/")
+    return path.rsplit("/", 1)[-1] if "/" in path else ""
+
+
 class AmlChatPage(BasePage):
     page_name = "aml_chat"
 
@@ -126,31 +132,157 @@ class AmlChatPage(BasePage):
     def new_session(self) -> None:
         self.loc("new_chat_button").click()
 
-    def send_message(self, text: str, ready_timeout_ms: int = 30_000) -> None:
-        """输入并发送消息（Enter）。
+    def switch_session(
+        self,
+        tag: str = "",
+        title: str = "",
+        expect_text: str = "",
+        forbid_text: str = "",
+        timeout_ms: int = 30_000,
+    ) -> dict:
+        """切换到指定会话并做逐会话身份核对（多会话并行切换语义原语）。
+
+        身份锚点 = 会话 URL（/chat/<uuid>，探查事实 2026-09-28）：会话标题异步生效
+        （首条消息/LLM 生成，繁忙时滞后分钟级），只作行定位快路径与观察证据。
+        切换路径：先试点击侧边栏会话行（真实用户手势，标题就绪即命中），
+        超时回退 goto 记录的会话 URL（send_message 时写入 flow_state）。
+        核对三点：URL 对号、会话内含 expect_text 回显、不含 forbid_text；
+        串台 / 切换未生效即 EvidenceError 冻结取证（不自愈）。
+        """
+        state = self.flow_state
+        key = tag or title or expect_text
+        recorded_url = state.get(key, "")
+        if not recorded_url and title:
+            for k, v in state.items():
+                if title in k or k in title:
+                    recorded_url = v
+                    break
+
+        switched_by = ""
+        row_budget = min(timeout_ms / 1000, 12)
+        deadline = time.time() + row_budget
+        while title and time.time() < deadline:
+            rows = self.loc("session_row").filter(has_text=title)
+            if rows.count():
+                rows.first.click()
+                switched_by = "row_click"
+                break
+            time.sleep(0.5)
+        if not switched_by:
+            if not recorded_url:
+                shot = self.snap("session-switch-no-anchor")
+                raise EvidenceError(
+                    f"会话未切换［归因: identity_mismatch］无可用锚点：tag={key!r} 无记录 URL，"
+                    f"标题 {title!r} 的会话行 {row_budget:.0f}s 内也未出现\n"
+                    f"  复现: url={self.page.url}\n  冻结截图: {shot or '（未捕获）'}",
+                    {
+                        "classification": "identity_mismatch",
+                        "cause": "切换目标无锚点（标题未生效且无记录 URL）",
+                        "repro": {"url": self.page.url, "tag": key, "title": title},
+                        "screenshots": [shot] if shot else [],
+                    },
+                )
+            self.page.goto(recorded_url, wait_until="domcontentloaded")
+            switched_by = "goto_url"
+
+        # 切换落定 + 身份三点核对（确定性内容，不看 LLM 措辞）
+        # 注：切换期「加载对话历史中」是产品已知偶发缺陷占位（AGENTS.md），
+        # 不在此处判死——内容未渲染时放行给 wait_reply_done（六信号含 history_cleared）
+        # 接力判定，保证用例等到最终回答才收尾；URL 对号 / 串台仍判 fail。
+        now_url, body, header = self.page.url, "", ""
+        url_ok = expect_ok = forbid_ok = False
+        msgs = 0
+        t0 = time.time()
+        deadline = t0 + 25
+        while True:
+            now_url = self.page.url
+            msgs = self.count("user_message")  # 软计数：重载水化期元素暂缺不抛错
+            body = (
+                "\n".join(self.loc("user_message").all_inner_texts()) if msgs else ""
+            )
+            try:
+                header = self.loc("session_header_title").first.inner_text(timeout=1500)
+            except Exception:  # noqa: BLE001 - 顶栏未就绪仅影响观察字段
+                header = ""
+            url_ok = (not recorded_url) or (_session_id(now_url) == _session_id(recorded_url))
+            expect_ok = (expect_text in body) if expect_text else True
+            forbid_ok = (forbid_text not in body) if forbid_text else True
+            if url_ok and expect_ok and forbid_ok:
+                break
+            # 串台（对方标记混入）需 URL 已对号 + 内容有 5s 交换窗口后才作数，防误判
+            if not forbid_ok and url_ok and time.time() - t0 > 5:
+                break
+            if time.time() >= deadline:
+                break
+            time.sleep(0.5)
+        loading = self.count("history_loading") > 0
+        deferred = bool(url_ok and forbid_ok and not expect_ok and (msgs == 0 or loading))
+        evidence = {
+            "switched_to": key,
+            "switched_by": switched_by,
+            "session_url": now_url,
+            "recorded_url": recorded_url,
+            "header_title": header.strip(),
+            "url_ok": url_ok,
+            "expect_found": expect_ok,
+            "forbid_found": not forbid_ok,
+            "body_check": "deferred_loading" if deferred else "checked",
+        }
+        if deferred:
+            return evidence  # 内容未渲染完：放行，最终回答完成判定接力核验
+        if not (url_ok and expect_ok and forbid_ok):
+            shot = self.snap("session-switch-mismatch")
+            evidence["screenshots"] = [shot] if shot else []
+            raise EvidenceError(
+                f"会话切换串台［归因: identity_mismatch］期望 {key!r}："
+                f"url_ok={url_ok}（{now_url} vs {recorded_url}），"
+                f"expect_found={expect_ok}，forbid_found={not forbid_ok}，顶栏={header.strip()!r}\n"
+                f"  复现: 切换后身份三点核对未过\n  冻结截图: {shot or '（未捕获）'}",
+                evidence,
+            )
+        return evidence
+
+    def send_message(
+        self,
+        text: str,
+        ready_timeout_ms: int = 30_000,
+        tag: str = "",
+    ) -> dict:
+        """输入并发送消息（Enter），并记录本会话 URL 供 switch_session 精确切换。
 
         发送前等待会话区就绪（「加载对话历史中」占位消失）；持续卡住则判失败，
         页面原状冻结取证（不自愈——卡住本身就是缺陷）。
+        tag：会话身份标记（多会话并行切换用例用；缺省用消息文本作键）。
         """
+        self._wait_history_ready(ready_timeout_ms, phase="send_message")
+        self.loc("message_input").fill(text)
+        self.page.keyboard.press("Enter")  # 产品约定：Enter 发送
+        self.page.wait_for_timeout(1500)  # 等路由落到会话 URL（/chat/<uuid>）
+        session_url = self.page.url
+        self.flow_state[tag or text] = session_url
+        return {"sent": text, "session_tag": tag or text, "session_url": session_url}
+
+    def _wait_history_ready(
+        self, ready_timeout_ms: int = 30_000, phase: str = "send_message"
+    ) -> None:
+        """等会话区「加载对话历史中」占位清除；持续卡住即冻结取证（hang_loading）。"""
         deadline = time.time() + ready_timeout_ms / 1000
         while self.count("history_loading") and time.time() < deadline:
             time.sleep(0.3)
         if self.count("history_loading"):
-            shot = self.snap("send-blocked")
+            shot = self.snap("history-hang")
             raise EvidenceError(
-                "消息未发送［归因: hang_loading］会话区持续「加载对话历史中」"
+                f"会话区未就绪［归因: hang_loading］持续「加载对话历史中」"
                 f"（{ready_timeout_ms}ms），页面保持原状待查\n"
-                f"  复现: url={self.page.url}\n"
+                f"  复现: url={self.page.url}，观察: {phase} 阶段\n"
                 f"  冻结截图: {shot or '（未捕获）'}",
                 {
                     "classification": "hang_loading",
-                    "cause": "会话区持续「加载对话历史中」，发送被阻塞",
-                    "repro": {"url": self.page.url, "observed": "send_message 阶段"},
+                    "cause": "会话区持续「加载对话历史中」，操作被阻塞",
+                    "repro": {"url": self.page.url, "observed": f"{phase} 阶段"},
                     "screenshots": [shot] if shot else [],
                 },
             )
-        self.loc("message_input").fill(text)
-        self.page.keyboard.press("Enter")  # 产品约定：Enter 发送
 
     def wait_reply_done(self, timeout_ms: int = 120_000) -> None:
         """等待「完整回答」生成结束：思考过程与最终答案都采集到才算完成。

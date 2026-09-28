@@ -35,7 +35,7 @@ def _tracked_files() -> list[str]:
 def test_tracked_files_have_no_secrets() -> None:
     violations: list[str] = []
     for name in _tracked_files():
-        if name == _SELF or Path(name).suffix.lower() in _SKIP_SUFFIX:
+        if Path(name).name == _SELF or Path(name).suffix.lower() in _SKIP_SUFFIX:
             continue
         text = Path(name).read_text(encoding="utf-8", errors="ignore")
         for label, pattern in _PATTERNS.items():

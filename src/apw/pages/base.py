@@ -68,6 +68,13 @@ class BasePage:
     def loc(self, name: str) -> Locator:
         return self.repo.resolve(self.page, self.page_name, name)
 
+    def loc_all(self, name: str) -> Locator:
+        """多元素定位器：需要 .filter/.nth 精确定位到具体元素时用（与 loc 同回退链）。
+
+        注意 loc() 是单元素语义（内部取 first），其后接 .filter/.nth 会静默落空。
+        """
+        return self.repo.resolve_multi(self.page, self.page_name, name)
+
     @property
     def flow_state(self) -> dict:
         """流程级共享状态：页面对象每步新建，但同一流程共享同一个 Playwright Page。

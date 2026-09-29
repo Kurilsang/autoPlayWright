@@ -8,7 +8,7 @@ from apw.pages.base import BasePage
 
 
 class FakeLoc:
-    """可控命中数的假定位器：count 立即返回，wait_for 模拟未附着。"""
+    """可控命中数的假定位器：count 立即返回，wait_for 模拟未附着，first 取单元素语义。"""
 
     def __init__(self, n: int) -> None:
         self._n = n
@@ -18,7 +18,7 @@ class FakeLoc:
 
     @property
     def first(self) -> FakeLoc:
-        return self
+        return FakeLoc(1)
 
     def wait_for(self, **kwargs) -> None:
         raise TimeoutError("not attached")
@@ -133,3 +133,22 @@ class TestSoftCountChain:
         repo = LocatorRepo.load(repo_dir)
         with pytest.raises(LookupError, match="ghost"):
             FakeChatPage(page=FakePage({}), repo=repo).count("ghost")
+
+
+class TestResolveMulti:
+    """多元素解析：集合语义原样返回；单元素 resolve 上再 .filter/.nth 会静默落空。"""
+
+    def test_hit_returns_multi_locator(self, repo_dir):
+        repo = LocatorRepo.load(repo_dir)
+        page = FakePage({("testid", "chat-input"): 3})
+        multi = repo.resolve_multi(page, "agent_chat", "chat_input", probe_timeout_ms=1)
+        assert multi.count() == 3
+        # 对照：单元素 resolve 取 first，集合语义必须走 resolve_multi
+        assert repo.resolve(page, "agent_chat", "chat_input", probe_timeout_ms=1).count() == 1
+
+    def test_all_miss_raises_lookup(self, repo_dir):
+        repo = LocatorRepo.load(repo_dir)
+        with pytest.raises(LookupError, match="chat_input"):
+            repo.resolve_multi(
+                FakePage({}), "agent_chat", "chat_input", probe_timeout_ms=1
+            )

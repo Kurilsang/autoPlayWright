@@ -157,3 +157,30 @@ class LocatorRepo:
                 reason = str(exc)[:80]
                 errors.append(f"{sel.by}={sel.value!r}: {type(exc).__name__}: {reason}")
         raise LocatorNotFound(page_name, locator_name, errors)
+
+    def resolve_multi(
+        self,
+        page: Page,
+        page_name: str,
+        locator_name: str,
+        probe_timeout_ms: int = 500,
+    ) -> Locator:
+        """多元素解析（不取 first）：.filter/.nth 精确定位到具体元素时用。
+
+        与 resolve 同候选回退链；resolve 的单元素语义上再 .filter/.nth 会静默落空
+        （2026-09-29 实测教训），需要集合语义一律走本方法。
+        """
+        entry = self._entry(page_name, locator_name)
+        hit = self._first_hit(page, entry)
+        if hit is not None:
+            return hit.loc
+        errors: list[str] = []
+        for sel in entry.candidates:
+            loc = build_locator(page, sel)
+            try:
+                loc.first.wait_for(state="attached", timeout=probe_timeout_ms)
+                return loc
+            except Exception as exc:  # noqa: BLE001 - 收集所有候选失败原因
+                reason = str(exc)[:80]
+                errors.append(f"{sel.by}={sel.value!r}: {type(exc).__name__}: {reason}")
+        raise LocatorNotFound(page_name, locator_name, errors)

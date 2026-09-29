@@ -162,7 +162,7 @@ class AmlChatPage(BasePage):
         row_budget = min(timeout_ms / 1000, 12)
         deadline = time.time() + row_budget
         while title and time.time() < deadline:
-            rows = self.loc("session_row").filter(has_text=title)
+            rows = self.loc_all("session_row").filter(has_text=title)
             if rows.count():
                 rows.first.click()
                 switched_by = "row_click"

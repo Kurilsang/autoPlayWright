@@ -1,0 +1,39 @@
+# 套组广场第 3 轮探查（生成侧资产）：发布设置的可见性控件 + 简易模式表单结构。
+# 只看结构不提交（点取消收场）。术语映射：用户口径「普通模式」= 产品「简易模式」。
+# 产物落 .scratch/autoPlayWright/snapshots/<env>/（gitignored，落盘自动脱敏）。
+name: suite-probe3
+targets:
+  - id: suite-publish-and-simple
+    route: /
+    steps:
+      - do: { page: aml_chat, action: select_agent_mode, args: { mode: "专家模式", timeout_ms: 3000 } }
+        label: load_popups_dismissed
+      - do: { page: aml_chat, action: dismiss_onboarding, args: {} }
+        label: popups_dismissed
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "专家套组广场", exact: true }, optional: true, timeout_ms: 5000 } }
+        label: nav_suite_plaza
+      # ---- 进阶表单的「发布设置」分区（可见性控件）----
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "header button:has-text('新建套组')" }, optional: true, timeout_ms: 5000 } }
+        label: open_mode_chooser
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "进阶模式", exact: true }, optional: true, timeout_ms: 4000 } }
+        label: open_advanced_form
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "发布设置", exact: true }, optional: true, timeout_ms: 4000 } }
+        label: open_publish_settings
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "suite_publish_settings" } }
+        label: dom_publish_settings
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "取消", exact: true }, optional: true, timeout_ms: 3000 } }
+        label: close_advanced
+      # ---- 简易模式表单（用户口径「普通模式」）----
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "header button:has-text('新建套组')" }, optional: true, timeout_ms: 5000 } }
+        label: open_mode_chooser_2
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "简易模式", exact: true }, optional: true, timeout_ms: 4000 } }
+        label: open_simple_form
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "suite_simple_form" } }
+        label: dom_simple_form
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "取消", exact: true }, optional: true, timeout_ms: 3000 } }
+        label: close_simple
+    signals:
+      - name: history_loading
+        selector: { by: text, value: 加载对话历史中, exact: false }

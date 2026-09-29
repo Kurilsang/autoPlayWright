@@ -1,0 +1,49 @@
+# 套组广场第 2 轮探查（生成侧资产）：两个「新建」入口 + 进阶/普通模式表单结构 + 可见性字段。
+# 只看结构不提交（点取消收场）；作用域区分两个入口：header=广场右上角，main=我的页内。
+# 产物落 .scratch/autoPlayWright/snapshots/<env>/（gitignored，落盘自动脱敏）。
+name: suite-probe2
+targets:
+  - id: suite-create
+    route: /
+    steps:
+      - do: { page: aml_chat, action: select_agent_mode, args: { mode: "专家模式", timeout_ms: 3000 } }
+        label: load_popups_dismissed
+      - do: { page: aml_chat, action: dismiss_onboarding, args: {} }
+        label: popups_dismissed
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "专家套组广场", exact: true }, optional: true, timeout_ms: 5000 } }
+        label: nav_suite_plaza
+      # ---- 入口①：广场右上角「新建套组」（header 作用域）----
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "header button:has-text('新建套组')" }, optional: true, timeout_ms: 5000 } }
+        label: open_create_from_plaza
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "suite_create_form" } }
+        label: dom_create_form
+      # ---- 表单内模式切换（进阶/普通，只看不提交）----
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "进阶模式", exact: false }, optional: true, timeout_ms: 3000 } }
+        label: switch_advanced
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "suite_create_advanced" } }
+        label: dom_create_advanced
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "普通模式", exact: false }, optional: true, timeout_ms: 3000 } }
+        label: switch_normal
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "suite_create_normal" } }
+        label: dom_create_normal
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "取消", exact: true }, optional: true, timeout_ms: 3000 } }
+        label: close_create_form
+      # ---- 入口②：我的套组页签内的「新建」（main 作用域）----
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "button:has-text('我的套组')" }, optional: true, timeout_ms: 4000 } }
+        label: open_my_tab
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "suite_my_tab" } }
+        label: dom_my_tab
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "main button:has-text('新建')" }, optional: true, timeout_ms: 4000 } }
+        label: open_create_from_my
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "suite_my_create" } }
+        label: dom_my_create
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "取消", exact: true }, optional: true, timeout_ms: 3000 } }
+        label: close_my_create
+    signals:
+      - name: history_loading
+        selector: { by: text, value: 加载对话历史中, exact: false }

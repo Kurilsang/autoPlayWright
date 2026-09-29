@@ -38,9 +38,13 @@ def default_registry() -> PageRegistry:
     from apw.pages.agent_chat import AgentChatPage
     from apw.pages.aml_chat import AmlChatPage
     from apw.pages.aml_workflow import AmlWorkflowPage
+    from apw.pages.skill_market import SkillMarketPage
+    from apw.pages.suite_plaza import SuitePlazaPage
 
     registry = PageRegistry()
     registry.register("agent_chat", AgentChatPage)
     registry.register("aml_chat", AmlChatPage)
     registry.register("aml_workflow", AmlWorkflowPage)
+    registry.register("skill_market", SkillMarketPage)
+    registry.register("suite_plaza", SuitePlazaPage)
     return registry

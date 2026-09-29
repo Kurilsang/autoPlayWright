@@ -1,0 +1,48 @@
+# 套组广场链路用例：新建套组 2x2（广场右上角/我的页虚线卡 × 简易/进阶模式），
+# 每个组合验创建回显刷新、单击预览 UI 可用、公开库不被污染。
+# 硬红线：仅 🔒私人（scope=private），绝不选 🌐公共/点「应用此套组」/双击卡片（=套用）。
+# 断言全部为确定性内容（回显/徽标/组件渲染），不断言 LLM 措辞。
+meta:
+  id: suite-plaza-create
+  name: 套组广场新建套组：2入口×2模式回显刷新与预览核对（仅私有）
+  platforms: [web]
+  envs: [test]
+  tags: [P0, suite, market]
+  owner: qa
+steps:
+  - do: { page: aml_chat, action: select_agent_mode, args: { mode: "专家模式", timeout_ms: 3000 } }
+  - do: { page: aml_chat, action: dismiss_onboarding, args: {} }
+  - do: { page: suite_plaza, action: open_plaza, args: {} }
+  # ================= 组合 1：广场入口 × 简易模式（用户口径「普通模式」）=================
+  - do: { page: suite_plaza, action: create_suite, args: { entry: "plaza", mode: "simple", name: "apw套组caseA 甲甲甲 111", description: "apw 私人套组用例A 甲甲甲 111" } }
+  - do: { page: suite_plaza, action: verify_mine_echo, args: { name: "apw套组caseA 甲甲甲 111", description: "apw 私人套组用例A 甲甲甲 111" } }
+  - do: { page: suite_plaza, action: preview_suite, args: { name: "apw套组caseA 甲甲甲 111", description: "apw 私人套组用例A 甲甲甲 111" } }
+  - assert: { type: visible, page: suite_plaza, target: detail_apply_button }
+  - assert: { type: text_contains, page: suite_plaza, target: detail_panel_root, expected: "apw套组caseA 甲甲甲 111" }
+  - do: { page: suite_plaza, action: close_preview, args: {} }
+  - do: { page: suite_plaza, action: verify_not_public, args: { name: "apw套组caseA 甲甲甲 111" } }
+  # ================= 组合 2：广场入口 × 进阶模式 =================
+  - do: { page: suite_plaza, action: create_suite, args: { entry: "plaza", mode: "advanced", name: "apw套组caseB 乙乙乙 222", description: "apw 私人套组用例B 乙乙乙 222" } }
+  - do: { page: suite_plaza, action: verify_mine_echo, args: { name: "apw套组caseB 乙乙乙 222", description: "apw 私人套组用例B 乙乙乙 222" } }
+  - do: { page: suite_plaza, action: preview_suite, args: { name: "apw套组caseB 乙乙乙 222", description: "apw 私人套组用例B 乙乙乙 222" } }
+  - assert: { type: visible, page: suite_plaza, target: detail_apply_button }
+  - assert: { type: text_contains, page: suite_plaza, target: detail_panel_root, expected: "apw套组caseB 乙乙乙 222" }
+  - do: { page: suite_plaza, action: close_preview, args: {} }
+  - do: { page: suite_plaza, action: verify_not_public, args: { name: "apw套组caseB 乙乙乙 222" } }
+  # ================= 组合 3：我的页虚线卡入口 × 简易模式 =================
+  - do: { page: suite_plaza, action: create_suite, args: { entry: "mine", mode: "simple", name: "apw套组caseC 丙丙丙 333", description: "apw 私人套组用例C 丙丙丙 333" } }
+  - do: { page: suite_plaza, action: verify_mine_echo, args: { name: "apw套组caseC 丙丙丙 333", description: "apw 私人套组用例C 丙丙丙 333" } }
+  - do: { page: suite_plaza, action: preview_suite, args: { name: "apw套组caseC 丙丙丙 333", description: "apw 私人套组用例C 丙丙丙 333" } }
+  - assert: { type: visible, page: suite_plaza, target: detail_apply_button }
+  - assert: { type: text_contains, page: suite_plaza, target: detail_panel_root, expected: "apw套组caseC 丙丙丙 333" }
+  - do: { page: suite_plaza, action: close_preview, args: {} }
+  - do: { page: suite_plaza, action: verify_not_public, args: { name: "apw套组caseC 丙丙丙 333" } }
+  # ================= 组合 4：我的页虚线卡入口 × 进阶模式 =================
+  - do: { page: suite_plaza, action: create_suite, args: { entry: "mine", mode: "advanced", name: "apw套组caseD 丁丁丁 444", description: "apw 私人套组用例D 丁丁丁 444" } }
+  - do: { page: suite_plaza, action: verify_mine_echo, args: { name: "apw套组caseD 丁丁丁 444", description: "apw 私人套组用例D 丁丁丁 444" } }
+  - do: { page: suite_plaza, action: preview_suite, args: { name: "apw套组caseD 丁丁丁 444", description: "apw 私人套组用例D 丁丁丁 444" } }
+  - assert: { type: visible, page: suite_plaza, target: detail_apply_button }
+  - assert: { type: text_contains, page: suite_plaza, target: detail_panel_root, expected: "apw套组caseD 丁丁丁 444" }
+  - do: { page: suite_plaza, action: close_preview, args: {} }
+  - do: { page: suite_plaza, action: verify_not_public, args: { name: "apw套组caseD 丁丁丁 444" } }
+  - judge: { note: "v1 预留：套组内容质量由 LLM-as-Judge 判定" }

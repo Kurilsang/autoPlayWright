@@ -1,0 +1,26 @@
+# Skills 广场第 4 轮探查（生成侧资产）：搞清「下载」按钮的真实行为
+# （用例实测：无浏览器下载事件、我的计数不变）。
+# 下载公开 skill 是被测链路本体（用户要求）；仅「上传公开」被禁。
+# 产物落 .scratch/autoPlayWright/snapshots/<env>/（gitignored，落盘自动脱敏）。
+name: skill-probe4
+targets:
+  - id: skill-download
+    route: /
+    steps:
+      - do: { page: aml_chat, action: select_agent_mode, args: { mode: "专家模式", timeout_ms: 3000 } }
+        label: load_popups_dismissed
+      - do: { page: aml_chat, action: dismiss_onboarding, args: {} }
+        label: popups_dismissed
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "Skills 广场", exact: true }, optional: true, timeout_ms: 5000 } }
+        label: nav_skill_plaza
+      - do: { page: probe, action: dump_dom, args: { name: "before_download" } }
+        label: dom_before_download
+      # ---- 点首个卡片的「下载」（公开 skill 下载=被测本体）----
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "下载", exact: true }, timeout_ms: 5000 } }
+        label: click_download
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "after_download" } }
+        label: dom_after_download
+    signals:
+      - name: history_loading
+        selector: { by: text, value: 加载对话历史中, exact: false }

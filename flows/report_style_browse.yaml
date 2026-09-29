@@ -1,0 +1,42 @@
+# 报告样式库浏览链路：进入样式库 → 预览弹层可用 → 标签切换逐类核对筛选生效（8 类 + 回全部）。
+# 断言全部为确定性内容（弹层组件/筛选后分组收敛/卡片渲染），不断言 LLM 措辞。
+# 硬红线：本用例不点「做同款」（跳转链路在 report_style_copy_run.yaml）、不点「新标签打开」。
+meta:
+  id: report-style-browse
+  name: 报告样式库：进入 + 预览 + 标签切换筛选核对
+  platforms: [web]
+  envs: [test]
+  tags: [P1, report_style, market]
+  owner: qa
+steps:
+  - do: { page: aml_chat, action: select_agent_mode, args: { mode: "专家模式", timeout_ms: 3000 } }
+  - do: { page: aml_chat, action: dismiss_onboarding, args: {} }
+  # ================= 进入 + 预览 =================
+  - do: { page: report_style, action: open_library, args: {} }
+  - assert: { type: visible, page: report_style, target: page_title }
+  - assert: { type: visible, page: report_style, target: style_card }
+  - do: { page: report_style, action: open_preview, args: {} }
+  - assert: { type: visible, page: report_style, target: preview_modal }
+  - assert: { type: visible, page: report_style, target: preview_iframe }
+  - do: { page: report_style, action: close_preview, args: {} }
+  # ================= 标签切换筛选（8 类逐一核对）=================
+  - do: { page: report_style, action: switch_tag, args: { label: "Jira 问题跟进" } }
+  - assert: { type: visible, page: report_style, target: style_card }
+  - do: { page: report_style, action: switch_tag, args: { label: "Confluence 总结" } }
+  - assert: { type: visible, page: report_style, target: style_card }
+  - do: { page: report_style, action: switch_tag, args: { label: "问题分析报告 (RCA)" } }
+  - assert: { type: visible, page: report_style, target: style_card }
+  - do: { page: report_style, action: switch_tag, args: { label: "代码 Review" } }
+  - assert: { type: visible, page: report_style, target: style_card }
+  - do: { page: report_style, action: switch_tag, args: { label: "代码分析" } }
+  - assert: { type: visible, page: report_style, target: style_card }
+  - do: { page: report_style, action: switch_tag, args: { label: "芯片数据分析 / 对比" } }
+  - assert: { type: visible, page: report_style, target: style_card }
+  - do: { page: report_style, action: switch_tag, args: { label: "项目状态总结" } }
+  - assert: { type: visible, page: report_style, target: style_card }
+  - do: { page: report_style, action: switch_tag, args: { label: "Confluence 原生页面报告" } }
+  - assert: { type: visible, page: report_style, target: style_card }
+  # ================= 回到全部（分组恢复多类）=================
+  - do: { page: report_style, action: switch_tag, args: { label: "全部" } }
+  - assert: { type: visible, page: report_style, target: style_card }
+  - judge: { note: "v1 预留：样式视觉质量由 LLM-as-Judge 判定" }

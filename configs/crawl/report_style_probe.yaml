@@ -1,0 +1,47 @@
+# 报告样式库首轮探查配置（生成侧资产）：
+# 找侧边栏「更多」→ 报告样式库入口、标签筛选条、样式卡片/预览、「做同款」按钮的页面结构。
+# 探查期用 probe 保留名的通用原语推进状态；页面对象产品化后把 probe 步骤
+# 替换为 page: report_style 的动作（参考 configs/crawl/aml_chat.yaml）。
+# 「做同款」会弹出新窗口，本轮只留结构痕迹不真点（新窗口注意力切换放页面对象里做）。
+# 产物落 .scratch/autoPlayWright/snapshots/<env>/（gitignored，落盘自动脱敏）。
+name: report-style-probe
+targets:
+  - id: report-style-lib
+    route: /
+    steps:
+      # 真实环境常见拦截层（延迟弹窗/新手引导），先幂等清掉
+      - do: { page: aml_chat, action: select_agent_mode, args: { mode: "专家模式", timeout_ms: 3000 } }
+        label: load_popups_dismissed
+      - do: { page: aml_chat, action: dismiss_onboarding, args: {} }
+        label: popups_dismissed
+        capture: true
+      # ---- 入口：侧边栏「更多」菜单 ----
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "更多", exact: true }, optional: true, timeout_ms: 5000 } }
+        label: open_more_menu
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "more_menu" } }
+        label: dom_more_menu
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "报告样式库", exact: true }, optional: true, timeout_ms: 5000 } }
+        label: nav_report_style
+        capture: true
+      - do: { page: probe, action: wait, args: { ms: 1500 } }
+        label: settle_list
+      - do: { page: probe, action: dump_dom, args: { name: "report_style_home" } }
+        label: dom_style_home
+      # ---- 预览（exact 防误中；未命中静默跳过）----
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "预览", exact: true }, optional: true, timeout_ms: 4000 } }
+        label: try_preview
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "style_preview" } }
+        label: dom_preview
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "div.fixed.inset-0 button:has(path[d^='M6 18L18 6'])" }, optional: true, timeout_ms: 3000 } }
+        label: close_preview
+      # ---- 点进去：卡片/条目进详情（卡片壳候选复用广场样式，未命中静默跳过）----
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "div.group.rounded-2xl" }, optional: true, timeout_ms: 4000 } }
+        label: try_open_detail
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "style_detail" } }
+        label: dom_detail
+    signals:
+      - name: history_loading
+        selector: { by: text, value: 加载对话历史中, exact: false }

@@ -61,6 +61,7 @@ Python 3.11+ / Playwright（同步 API）/ pytest 9（pytest11 插件入口）/ 
 - 对话并行切换链路已交付（2026-09-28）：`flows/chat_concurrent_switch.yaml` 双会话并行生成 + 来回切换逐会话身份核对（URL 锚点对号 + 输入回显 + 对方标记零混入），真实环境 3 次绿跑；`AmlChatPage.switch_session` 语义原语 + `BasePage.flow_state` 流程级共享状态
 - Skills 广场链路已交付（2026-09-29）：`flows/skill_market_upload_download.yaml` 私人 skill 上传回显/预览 + 广场下载 + 筛选标签核对，真实环境 3 次绿跑；`SkillMarketPage`（上传硬红线仅 private）+ `locators/skill_market.yaml` + `LocatorRepo.resolve_multi` 多元素解析出口（修复 resolve 单元素上 .filter/.nth 静默落空）
 - 套组广场链路已交付（2026-09-29）：`flows/suite_plaza_create.yaml` 新建套组 2×2（广场右上角/我的页虚线卡入口 × 简易/进阶模式）+ 回显刷新 + 单击预览 + 公开库无泄漏，真实环境 3 次绿跑；`SuitePlazaPage`（仅私有硬红线）+ `locators/suite_plaza.yaml`
+- 报告样式库链路已交付（2026-09-29）：`flows/report_style_browse.yaml`（进入/预览/标签切换 8 类逐一核对筛选收敛）+ `flows/report_style_copy_run.yaml`（做同款跳转 → 运行 → 工作区产物落位），真实环境 3 次绿跑；`ReportStylePage` + `locators/report_style.yaml`
 - 回复判定 = **完整回答六信号**（停止消失/推理步骤/最终答案/操作行/稳定/加载清除）；`capture_context` 把对话上下文（输入/推理步骤/思考过程/最终答案）写入报告证据
 - 失败取证：EvidenceError 带归因分类（hang_loading/streaming_stuck/reply_incomplete/content_unstable + gen_stuck/gen_incomplete/run_stuck/run_incomplete/identity_mismatch）+ 复现 + 信号时间线 + 冻结截图
 - 测试环境地址在本地 `configs/envs/test.yaml`（gitignored，模板 `test.example.yaml`）；正式环境**勿跑测试/爬取**；测试环境免登录直达会话页
@@ -71,7 +72,9 @@ Python 3.11+ / Playwright（同步 API）/ pytest 9（pytest11 插件入口）/ 
 - 已知产品行为：Skills 广场下载为 JS 存盘——无浏览器下载事件、无 UI 反馈，成功信号 = `GET /api/skills/<id>/download` 2xx + 包字节数；预览弹层靠头部 X 关闭（Esc 不关闭）；可见性 radio `scope=private|public`（🔒私人/🌐公共）
 - 已知产品缺陷：套组新建表单的英文名/英文描述为**静默必填**——缺失时「创建套组」点击静默 no-op（零网络零校验提示，2026-09-29 实测）；且提交需停在「基本信息」分区（停留「发布设置」提交同样静默 no-op）
 - 已知产品行为：套组卡片单击=预览模态（右上 X 或 Esc 关闭）、双击=套用；自有套组预览仅「✦应用此套组」，公开套组另有「⏳发起长任务」与「Agent 配置」区；卡片徽标=Agent 类型（快速/专家模式）非创建模式
-- 测试基线：`pytest tests` 全绿（框架自测，含证据链路/失败取证/三态报告/脱敏用例/红线门禁）；工作流 4 条链路 + 对话并行切换 + Skills 广场 + 套组广场真实环境 3 次绿跑
+- 已知产品行为：报告样式库（侧边栏「更多场景」→ 场景卡）8 类 28 套样式；卡片「预览/做同款」开同一弹层（头部：做同款/新标签打开/关闭），弹层「做同款」=一键复制官方示例工作流跳转 `/workflows/<uuid>`（副本名含「官方模板」「(Fork)」；实测同页跳转，页面对象兼容弹窗形态）；运行面板参数默认预填，**recipients 留空=不发邮件（用例绝不填）**；「工作流产物」区「· 产物」行 = 工作区最终结果
+- 已知框架陷阱：Playwright 同步 API 纯 `time.sleep` 轮询不泵事件循环，`page.url` 会停在旧值（做同款跳转等待曾误判未跳转）——轮询一律走 API 调用（`wait_for_timeout`/`count`/`inner_text`）
+- 测试基线：`pytest tests` 全绿（框架自测，含证据链路/失败取证/三态报告/脱敏用例/红线门禁）；工作流 4 条链路 + 对话并行切换 + Skills 广场 + 套组广场 + 报告样式库 2 条真实环境 3 次绿跑
 - 评审修复批次 P0 已交付（`.scratch/review-p0/`，6 票全 done）：prepare 失败与空步骤终态留痕、报告三态 + 跳过原因、run 目录唯一化 + 汇总合并、快照脱敏管道、定位器计数与解析同链
 - 留空待输入：仅 Electron 安装包 launch（T03，CDP attach 可用）
 - 下一步：评审 P1/P2（见 `.scratch/review-p0/backlog.md`）→ 04 原语库（两档制 + 收口规则）→ 07 生成器（opencode skill）→ 08；业务用例扩量（v1 目标 20~50 条）

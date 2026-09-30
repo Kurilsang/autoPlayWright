@@ -150,3 +150,5 @@ Python 3.11+、Playwright（同步 API）、pytest、pytest-xdist、allure-pytes
 | D20 | 快照 schema 骨架 | 定稿（Q21 通过）：route/url/state_path/elements（name_hint/region/role/candidates/…）/signals/screenshots/dom_excerpt；字段宁多勿缺，dom_excerpt 作可选保留（2026-09-23） |
 | D21 | 探查原语与 scripts/ 升格 | 生成侧探查原语（crawler 保留名 `page: probe`，goto/click/type/insert/dump_dom）服务未知页面首轮取证，不占流程原语两档配额、流程用例禁用；`scripts/` 升格经人工判定执行（snapshot_summary，2026-09-24 用户授权）（2026-09-24） |
 | D22 | 敏感红线机器门禁 | 红线两度返工（e659178 出库、2026-09-24 脱敏批）达「同类违规反复」阈值 → 入库文件扫描门禁 `tests/test_no_secrets.py`（内网 IP/凭据值/产品名），提交前随 `pytest tests` 强制执行（2026-09-24） |
+| D23 | 跨步骤动态身份锚 | flow YAML 静态，动态身份（刚创建的资源名、跳转落点）由页面对象写入 `BasePage.flow_state` 流程级共享状态、后续步骤读取（实证：对话并行切换 URL 锚、套组→操练场绑定）；断言只用归一化文本/语义属性（2026-09-28 起） |
+| D24 | AI 长任务完成判定 | 一律多信号收敛判完成（对话六信号；工作流/操练场运行=完成行+状态+统计+输入回显+输出行+日志稳定），单信号会被推理期/半截渲染误判；未达成即 EvidenceError 分类取证冻结现场，禁自愈重试（2026-09-30） |

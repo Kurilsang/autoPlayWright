@@ -27,7 +27,7 @@ const panels: {
     tag: 'flows/',
     tone: COLORS.accent2,
     items: [
-      '7 条链路入库：会话冒烟、示例、对话并行切换',
+      '12 条链路入库：会话、并行切换、广场、样式库、操练场',
       '工作流 4 条：手写保存运行 / AI 生成运行',
       '并发 2 个 AI 生成任务 / 并发 2 个 AI 运行任务',
       '并发 UI 逐标签身份核对，串台/卡死判 fail',
@@ -55,7 +55,7 @@ const panels: {
       '快照骨架：状态路径标注 + 定位器候选',
       '落盘自动脱敏：映射表 + 通用模式兜底',
       'tests 全绿；tests/test_no_secrets.py 红线门禁',
-      '文档：docs/SPEC.md（22 条决策记录）+ AGENTS.md',
+      '文档：docs/SPEC.md（24 条决策记录）+ AGENTS.md',
     ],
   },
 ];

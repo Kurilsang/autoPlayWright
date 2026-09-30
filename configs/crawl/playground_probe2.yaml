@@ -1,0 +1,40 @@
+# 操练场第 2 轮探查（生成侧资产）：「新建会话」弹窗——套组选择器 + 模式选择 + 确认按钮结构。
+# 链路目标：创建套组 → 操练场 → 选用刚创建的套组 → 简单对话调试。
+# 本轮只推进到弹窗内部结构与套组选中态，不做真实创建（确认按钮识别后下一轮走完整链）。
+# 产物落 .scratch/autoPlayWright/snapshots/<env>/（gitignored，落盘自动脱敏）。
+name: playground-probe2
+targets:
+  - id: playground-new-session
+    route: /
+    steps:
+      - do: { page: aml_chat, action: select_agent_mode, args: { mode: "专家模式", timeout_ms: 3000 } }
+        label: load_popups_dismissed
+      - do: { page: aml_chat, action: dismiss_onboarding, args: {} }
+        label: popups_dismissed
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "更多场景", exact: true }, optional: true, timeout_ms: 5000 } }
+        label: open_more_scenes
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "button:has(span:text-is('操练场'))" }, optional: true, timeout_ms: 5000 } }
+        label: nav_playground
+      - do: { page: probe, action: wait, args: { ms: 1500 } }
+        label: settle_playground
+      # ---- 新建会话弹窗 ----
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "新建会话", exact: true }, optional: true, timeout_ms: 5000 } }
+        label: open_new_session
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "pg_new_session" } }
+        label: dom_new_session
+      # ---- 套组选择器候选（弹窗里找既有测试套组，选中看态）----
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "apw套组caseD 丁丁丁 444", exact: true }, optional: true, timeout_ms: 4000 } }
+        label: try_pick_suite
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "pg_suite_picked" } }
+        label: dom_suite_picked
+      # ---- 模式选择候选（测试模式 / Agent 助手模式）----
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "测试模式", exact: true }, optional: true, timeout_ms: 4000 } }
+        label: try_pick_mode
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "pg_mode_picked" } }
+        label: dom_mode_picked
+    signals:
+      - name: history_loading
+        selector: { by: text, value: 加载对话历史中, exact: false }

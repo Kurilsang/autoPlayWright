@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import time
+from datetime import datetime
 
 from apw.pages.base import BasePage, EvidenceError
 
@@ -79,17 +80,23 @@ class SuitePlazaPage(BasePage):
         mode: str = "simple",
         entry: str = "plaza",
         timeout_ms: int = 20_000,
+        unique: bool = False,
     ) -> dict:
         """新建套组（2x2：entry=plaza|mine × mode=simple|advanced），仅私有。
 
         流程：入口 → 模式选择卡 → 表单填名称/描述（受控输入真实键入）→
         发布设置核对可见性 🔒私人选中且 🌐公共未选（硬红线）→ 创建套组。
         成功信号=新建表单消失；未生效/可见性异常即 EvidenceError 冻结取证。
+
+        unique=True 时名称追加时间戳（防重复名歧义），并把创建名写入 flow_state
+        供跨步骤锚定（如操练场「从套组加载」按名绑定刚创建的套组）。
         """
         if mode not in ("simple", "advanced"):
             raise ValueError(f"未知模式 {mode!r}，可选 simple|advanced")
         if entry not in ("plaza", "mine"):
             raise ValueError(f"未知入口 {entry!r}，可选 plaza|mine")
+        if unique:
+            name = f"{name}-{datetime.now().strftime('%m%d%H%M%S')}"
 
         self.open_tab("plaza" if entry == "plaza" else "mine")
         self.loc("create_entry_plaza" if entry == "plaza" else "create_entry_mine").click()
@@ -198,6 +205,7 @@ class SuitePlazaPage(BasePage):
                     "screenshots": [shot] if shot else [],
                 },
             )
+        self.flow_state["suite_name"] = name  # 跨步骤锚：下游（如操练场）按名绑定本套组
         return {
             "created_name": name,
             "mode": mode,

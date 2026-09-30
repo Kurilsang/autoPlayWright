@@ -62,6 +62,7 @@ Python 3.11+ / Playwright（同步 API）/ pytest 9（pytest11 插件入口）/ 
 - Skills 广场链路已交付（2026-09-29）：`flows/skill_market_upload_download.yaml` 私人 skill 上传回显/预览 + 广场下载 + 筛选标签核对，真实环境 3 次绿跑；`SkillMarketPage`（上传硬红线仅 private）+ `locators/skill_market.yaml` + `LocatorRepo.resolve_multi` 多元素解析出口（修复 resolve 单元素上 .filter/.nth 静默落空）
 - 套组广场链路已交付（2026-09-29）：`flows/suite_plaza_create.yaml` 新建套组 2×2（广场右上角/我的页虚线卡入口 × 简易/进阶模式）+ 回显刷新 + 单击预览 + 公开库无泄漏，真实环境 3 次绿跑；`SuitePlazaPage`（仅私有硬红线）+ `locators/suite_plaza.yaml`
 - 报告样式库链路已交付（2026-09-29）：`flows/report_style_browse.yaml`（进入/预览/标签切换 8 类逐一核对筛选收敛）+ `flows/report_style_copy_run.yaml`（做同款跳转 → 运行 → 工作区产物落位），真实环境 3 次绿跑；`ReportStylePage` + `locators/report_style.yaml`
+- 操练场链路已交付（2026-09-30）：`flows/playground_suite_debug.yaml` 创建私有套组 → 操练场新建会话绑定刚建套组（身份锚三连：unique 名/选择器/「已加载」徽标）→ 测试套组模式简单对话调试（六信号判完成），真实环境 3 次绿跑；`PlaygroundPage` + `locators/playground.yaml`；`SuitePlazaPage.create_suite` 增 `unique` 命名 + `flow_state["suite_name"]` 跨步锚
 - 回复判定 = **完整回答六信号**（停止消失/推理步骤/最终答案/操作行/稳定/加载清除）；`capture_context` 把对话上下文（输入/推理步骤/思考过程/最终答案）写入报告证据
 - 失败取证：EvidenceError 带归因分类（hang_loading/streaming_stuck/reply_incomplete/content_unstable + gen_stuck/gen_incomplete/run_stuck/run_incomplete/identity_mismatch）+ 复现 + 信号时间线 + 冻结截图
 - 测试环境地址在本地 `configs/envs/test.yaml`（gitignored，模板 `test.example.yaml`）；正式环境**勿跑测试/爬取**；测试环境免登录直达会话页
@@ -74,7 +75,8 @@ Python 3.11+ / Playwright（同步 API）/ pytest 9（pytest11 插件入口）/ 
 - 已知产品行为：套组卡片单击=预览模态（右上 X 或 Esc 关闭）、双击=套用；自有套组预览仅「✦应用此套组」，公开套组另有「⏳发起长任务」与「Agent 配置」区；卡片徽标=Agent 类型（快速/专家模式）非创建模式
 - 已知产品行为：报告样式库（侧边栏「更多场景」→ 场景卡）8 类 28 套样式；卡片「预览/做同款」开同一弹层（头部：做同款/新标签打开/关闭），弹层「做同款」=一键复制官方示例工作流跳转 `/workflows/<uuid>`（副本名含「官方模板」「(Fork)」；实测同页跳转，页面对象兼容弹窗形态）；运行面板参数默认预填，**recipients 留空=不发邮件（用例绝不填）**；「工作流产物」区「· 产物」行 = 工作区最终结果
 - 已知框架陷阱：Playwright 同步 API 纯 `time.sleep` 轮询不泵事件循环，`page.url` 会停在旧值（做同款跳转等待曾误判未跳转）——轮询一律走 API 调用（`wait_for_timeout`/`count`/`inner_text`）
-- 测试基线：`pytest tests` 全绿（框架自测，含证据链路/失败取证/三态报告/脱敏用例/红线门禁）；工作流 4 条链路 + 对话并行切换 + Skills 广场 + 套组广场 + 报告样式库 2 条真实环境 3 次绿跑
+- 已知产品行为：操练场（更多场景→「创作与调试」组）= 套组调试沙箱，会话卡绑一个套组；「新建会话」弹窗（会话名称 + 原生 select 从套组加载）确定后**直接进 IDE**（列表恢复才走「进入调试」）；IDE 两种模式=Agent 助手（读写工作区文件）/▶测试套组（输入用户消息 Enter 运行一次完整推理）；运行日志=「▶ 操练场运行开始」→「Prompt: 回显」→「│」输出行→「✅ 运行完成，用时 Ns，Token: N」，顶栏状态 空闲→已完成
+- 测试基线：`pytest tests` 全绿（框架自测，含证据链路/失败取证/三态报告/脱敏用例/红线门禁）；工作流 4 条链路 + 对话并行切换 + Skills 广场 + 套组广场 + 报告样式库 2 条 + 操练场真实环境 3 次绿跑
 - 评审修复批次 P0 已交付（`.scratch/review-p0/`，6 票全 done）：prepare 失败与空步骤终态留痕、报告三态 + 跳过原因、run 目录唯一化 + 汇总合并、快照脱敏管道、定位器计数与解析同链
 - 留空待输入：仅 Electron 安装包 launch（T03，CDP attach 可用）
 - 下一步：评审 P1/P2（见 `.scratch/review-p0/backlog.md`）→ 04 原语库（两档制 + 收口规则）→ 07 生成器（opencode skill）→ 08；业务用例扩量（v1 目标 20~50 条）

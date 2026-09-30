@@ -1,0 +1,30 @@
+# 操练场核心链路：创建套组 → 操练场新建会话绑定刚建套组 → 测试套组模式简单对话调试。
+# 身份锚三连：创建名（unique 时间戳后缀，flow_state 跨步传递）→ 选择器选中 → IDE「已加载：<套组名>」。
+# 调试运行 = AI 一次完整推理，完成判定六信号（完成行/状态已完成/Token 统计/Prompt 回显/回复输出/日志稳定）。
+# 硬红线：套组仅私有；不点「更新套组/另存为新套组/导入导出/重置工作区」；不动工具开关/推理模式/系统 Prompts。
+# 断言全部为确定性内容（绑定徽标/完成行/日志壳），不断言 LLM 措辞。
+meta:
+  id: playground-suite-debug
+  name: 操练场：创建套组 → 绑定套组新建会话 → 测试套组简单对话调试
+  platforms: [web]
+  envs: [test]
+  tags: [P0, playground, suite]
+  owner: qa
+steps:
+  - do: { page: aml_chat, action: select_agent_mode, args: { mode: "专家模式", timeout_ms: 3000 } }
+  - do: { page: aml_chat, action: dismiss_onboarding, args: {} }
+  # ================= 1. 创建私有套组（unique 名防重复歧义）=================
+  - do: { page: suite_plaza, action: create_suite, args: { name: "apw操练场套组 丁丁丁 555", description: "apw 操练场链路用套组 丁丁丁 555", mode: "simple", entry: "plaza", unique: true } }
+  - do: { page: suite_plaza, action: verify_mine_echo, args: { name: "apw操练场套组 丁丁丁 555", description: "apw 操练场链路用套组 丁丁丁 555" } }
+  - do: { page: suite_plaza, action: verify_not_public, args: { name: "apw操练场套组 丁丁丁 555" } }
+  # ================= 2. 操练场新建会话，绑定刚创建的套组 =================
+  - do: { page: playground, action: open_playground, args: {} }
+  - assert: { type: visible, page: playground, target: new_session_button }
+  - do: { page: playground, action: new_session, args: { name: "apw调试会话 555" } }
+  - assert: { type: visible, page: playground, target: suite_loaded_badge }
+  - assert: { type: visible, page: playground, target: run_input }
+  # ================= 3. 简单对话调试（测试套组模式，六信号判完成）=================
+  - do: { page: playground, action: send_debug_message, args: { message: "apw 调试：请用一句话总结你能做什么", timeout_ms: 300000 } }
+  - assert: { type: visible, page: playground, target: run_done_marker }
+  - assert: { type: text_contains, page: playground, target: run_done_marker, expected: "运行完成" }
+  - judge: { note: "v1 预留：调试回复质量由 LLM-as-Judge 判定" }

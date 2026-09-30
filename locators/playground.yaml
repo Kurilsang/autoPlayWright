@@ -1,0 +1,104 @@
+# 操练场（套组调试沙箱）：入口画廊 + 会话列表 + 调试 IDE（套组配置/运行日志/工作区文件）。
+# 由 playground_probe{,2,3} + workspace 探查产物（2026-09-30）生成，人工审核入库。
+# 真实应用无 data-testid；候选按稳定文本/属性 → css 兜底书写。
+# 产品事实：
+# - 入口 = 侧边栏「更多场景」→「创作与调试」组场景卡「操练场」；会话卡绑一个套组（进入调试）；
+# - 「新建会话」弹窗 = 会话名称 + 原生 select「从套组加载（可选）」+ 确定/取消，确定后**直接进 IDE**；
+# - IDE 三块：套组配置（含「已加载：<套组名>」身份锚徽标）/ 运行日志 / 工作区文件；
+# - 底部模式切换：Agent 助手（读写工作区文件）/ ▶ 测试套组（用当前配置快照运行一次套组）；
+# - 测试套组运行 = 输入用户消息 Enter 运行 → 运行日志逐行渲染（Prompt 回显/推理输出/完成行）。
+page: playground
+locators:
+  # ---- 入口：侧边栏「更多场景」→ 场景卡 ----
+  - name: nav_more_scenes
+    source: ai
+    candidates:
+      - { by: text, value: 更多场景 }
+  - name: nav_playground
+    source: manual
+    candidates:
+      - { by: css, value: "button:has(span:text-is('操练场'))" }   # 场景卡按钮（入口语义）
+      - { by: text, value: 操练场 }
+  # ---- 会话列表 ----
+  - name: page_title
+    source: manual
+    candidates:
+      - { by: css, value: "h1:text-is('操练场')" }
+  - name: new_session_button
+    source: ai
+    candidates:
+      - { by: text, value: 新建会话 }
+  - name: session_card
+    source: manual
+    candidates:
+      - { by: css, value: "div.rounded-xl:has(button:text-is('进入调试'))" }   # 会话卡（绑套组）
+  - name: enter_debug_button
+    source: ai
+    candidates:
+      - { by: text, value: 进入调试 }
+  # ---- 新建会话弹窗（会话名称 + 套组 select）----
+  - name: session_dialog
+    source: manual
+    candidates:
+      - { by: css, value: "div.fixed.inset-0:has(input[placeholder='例如：测试多Agent套组'])" }
+  - name: session_name_input
+    source: ai
+    candidates:
+      - { by: placeholder, value: "例如：测试多Agent套组" }
+  - name: session_suite_select
+    source: manual
+    candidates:
+      - { by: css, value: "div.fixed.inset-0:has(input[placeholder='例如：测试多Agent套组']) select" }   # 从套组加载（可选）
+  - name: dialog_confirm
+    source: manual
+    candidates:
+      - { by: css, value: "div.fixed.inset-0:has(input[placeholder='例如：测试多Agent套组']) button:text-is('确定')" }
+      - { by: text, value: 确定 }
+  # ---- 调试 IDE ----
+  - name: ide_title
+    source: manual
+    candidates:
+      - { by: css, value: "h1.text-base.font-semibold" }   # 顶栏会话名（🧪 旁）
+  - name: suite_loaded_badge
+    source: manual
+    candidates:
+      - { by: css, value: "div.rounded-md:has(button[title='清除提示'])" }   # 「📦 已加载：<套组名>」身份锚徽标
+  - name: ide_back_button
+    source: ai
+    candidates:
+      - { by: css, value: "button[title='← 返回会话列表']" }
+  # ---- 模式切换（底部；title 语义属性最稳）----
+  - name: mode_agent_button
+    source: manual
+    candidates:
+      - { by: css, value: "button[title='让 Agent 实时读写工作区文件（类 Cursor 模式）']" }
+  - name: mode_test_button
+    source: manual
+    candidates:
+      - { by: css, value: "button[title='用当前配置快照运行一次套组']" }   # ▶ 测试套组（可访问名含 ▶ 图标）
+  # ---- 测试套组运行区 ----
+  - name: run_input
+    source: manual
+    candidates:
+      - { by: placeholder, value: "输入用户消息 / 任务描述", exact: false }   # Enter 运行
+  - name: run_log_line
+    source: manual
+    candidates:
+      - { by: css, value: "div.flex.gap-2.leading-5" }   # 运行日志行（行号 + 文本）
+  - name: run_done_marker
+    source: manual
+    candidates:
+      - { by: css, value: "div.flex.gap-2.leading-5:has-text('✅ 运行完成')" }   # 日志完成行（绿字）
+  - name: run_running_marker
+    source: manual
+    candidates:
+      # 运行中态（底部模式条内；不圈定会误中 LLM 回复里的「运行中」字样）
+      - { by: css, value: "div.border-t:has(button[title='用当前配置快照运行一次套组']):has-text('运行中')" }
+  - name: run_status_done
+    source: manual
+    candidates:
+      - { by: text, value: 已完成 }   # 顶栏状态徽标（空闲→…→已完成）
+  - name: run_token_stat
+    source: manual
+    candidates:
+      - { by: css, value: "span:has-text('Tokens')" }   # 顶栏 Token 统计（证据）

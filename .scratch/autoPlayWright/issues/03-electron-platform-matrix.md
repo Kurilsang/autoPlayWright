@@ -7,9 +7,10 @@
 **Status:** ready-for-agent
 
 > 进度（2026-09-23）：CDP attach 已可用（环境配置 `cdp_endpoint` 即连）；安装包 launch 仍留空待输入（`executable_path`，spec 开放项 2）。
+> 进度（2026-10-08）：桌面端对话冒烟 `flows/desktop_chat_smoke.yaml` 经 CDP attach 在真实客户端 3 次绿跑（`configs/envs/desktop.yaml`）；desktop-only 在 web 环境 skip 留痕已验证；版本兼容实证：Electron 39/Chrome 142，Playwright `connect_over_cdp` 正常。共享 flow 两端回放与安装包 launch 仍待。
 
 - [ ] 桌面端两种连接方式可用，统一输出 Playwright Page，上层零改动
 - [ ] platforms 字段生效矩阵：共享 flow 两端各执行一遍；desktop-only 在 web 运行时 skip 并在报告中标注原因
-- [ ] 示例 flow 在客户端上执行通过（含会话页到达与发送消息）
+- [x] 示例 flow 在客户端上执行通过（含会话页到达与发送消息）
 - [ ] Electron 可执行文件获取方式确定并写入环境配置（固定安装路径 / CI 构建产物下载，对应 spec 开放项 2）
-- [ ] 版本兼容性风险记录：客户端 Electron 版本与 Playwright 的适配验证结论
+- [x] 版本兼容性风险记录：客户端 Electron 版本与 Playwright 的适配验证结论

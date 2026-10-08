@@ -42,7 +42,7 @@ steps:
   - judge: { note: "v1 预留：LLM-as-Judge 后续接入" }
 ```
 
-真实环境链路可参考 `flows/aml_chat_smoke.yaml`（`--apw-env test` 执行；已入库 12 条链路见 `flows/*.yaml`）。
+真实环境链路可参考 `flows/aml_chat_smoke.yaml`（`--apw-env test` 执行；已入库 13 条链路见 `flows/*.yaml`，含桌面端 `flows/desktop_chat_smoke.yaml`）。
 新页面的完整新增流程（探查快照 → 定位器 → 页面对象 → flow → 验收门）见 `AGENTS.md`「怎么加用例」。
 
 配套要素：
@@ -65,6 +65,8 @@ Allure 集成（可选）：默认无需 Allure 工具链；需要 Allure 平台
 ```powershell
 pytest flows --apw-env fixture -k example   # 按环境/关键字过滤
 pytest flows --apw-env test                 # 真实测试环境（表单登录自动完成）
+# 桌面端（Electron 客户端先带调试端口启动：<app>.exe --remote-debugging-port=9333）
+pytest flows/desktop_chat_smoke.yaml --apw-env desktop
 
 # 调试模式：窗口可见 + 放慢动作，实时观察执行过程
 pytest flows --apw-env test --apw-headed --apw-slowmo 250
@@ -76,8 +78,9 @@ python -m apw.crawler --env test --config configs/crawl/aml_chat.yaml
 
 ## 当前留空（接缝已就位，等输入）
 
-- **Electron launch**：`driver.mode=electron` 当前仅支持 CDP attach，
-  安装包 launch 待 T03（`--apw-env` 环境里配 `cdp_endpoint` 即可先试 attach）。
+- **Electron launch**：`driver.mode=electron` 当前仅支持 CDP attach
+  （已有真实用例跑通：`flows/desktop_chat_smoke.yaml` @ `configs/envs/desktop.yaml`），
+  安装包 launch 待 T03。
 
 ## 开发
 

@@ -63,7 +63,7 @@ steps:
 
 （实现现状 2026-09-24：assert 仅 `visible|text_contains`；`vars`/`hook`/`text_regex`/`element_count` 为票 04 待落。）
 
-- `engine`：DSL 解释器。加载 → 校验 → 顺序执行 steps（通过 Page Object 与钩子注册表）→ 持续产出 StepEvent 事件流。内置"完整回答"完成判定（实现演进 2026-09-23：六信号缺一不可——停止按钮消失、思考过程组件在场、最终答案标识在场、完成态操作行在场、文本稳定、历史加载占位清除；单信号会被推理期/半截渲染误判）。动作返回 dict 即作为结构化证据写入 StepEvent.evidence。实现演进 2026-09-24（评审 P0）：prepare/导航失败转为失败步骤事件（kind=prepare）写入报告——发生即留痕，不再凭空消失；空步骤双层防御（加载期拒绝 + 运行层兜底判 failed），空壳用例不得刷绿。
+- `engine`：DSL 解释器。加载 → 校验 → 顺序执行 steps（通过 Page Object 与钩子注册表）→ 持续产出 StepEvent 事件流。内置"完整回答"完成判定（实现演进 2026-09-23：六信号缺一不可——停止按钮消失、思考过程组件在场、最终答案标识在场、完成态操作行在场、文本稳定、历史加载占位清除；单信号会被推理期/半截渲染误判）。实现演进 2026-10-08（桌面端）：判定信号按客户端结构差异落地于页面对象（停止生成消失/回答气泡/Thought 块在场/完成态操作行/稳定，另测 Thought 展开交互），流式结束且内容稳定后仍缺结构信号即立即取证，不空等超时。动作返回 dict 即作为结构化证据写入 StepEvent.evidence。实现演进 2026-09-24（评审 P0）：prepare/导航失败转为失败步骤事件（kind=prepare）写入报告——发生即留痕，不再凭空消失；空步骤双层防御（加载期拒绝 + 运行层兜底判 failed），空壳用例不得刷绿。
 - `crawler`（AI 生成侧）：Playwright 驱动的遍历器，产出页面快照 JSON（路由、语义化交互元素：role/name/testid/placeholder）+ 截图。生成器将快照 + 业务描述交给 LLM 产出 flow 草稿与定位器候选，输出为可评审的 diff。快照对比器支持重爬 diff，输出受影响的定位器/页面/链路影响清单。
 - `sanitize`（产物脱敏，实现决策 2026-09-24 评审 P0）：快照/探查产物落盘前统一脱敏为占位符——映射表驱动（真实串只存本地 `configs/sanitize.local.yaml`，模板 `sanitize.example.yaml`），按词边界、长键优先替换；另有通用模式兜底（邮件/有点账号句柄 → `<user>`，http(s) 主机 → `<host>` 路径保留；宁可过掩码不可漏掩码，公网主机一并掩码是有意取舍）。文本类快照（JSON/HTML）不入库，与 PNG 忽略先例一致，忽略清单兜底。
 - `judge`：v1 仅定义接口形状（判定上下文入参 → 评分/结论/理由的结构化出参），不实现判定逻辑；引擎遇到 `judge` 步骤标记 planned 并写入报告（planned ≠ skipped：skipped 专指平台/环境不匹配未执行）。
@@ -76,7 +76,7 @@ steps:
 - 限流感知重试：429 类错误按退避策略重试，重试计入报告。
 - 会话隔离：每条 flow 执行时新建会话，用例间无数据依赖。
 - 失败时自动留存 Playwright trace、截图，路径写入 StepEvent。
-- 失败即取证，禁止自愈（实现决策 2026-09-23）：卡死/半截渲染等 UI 缺陷本身就是被测对象，测试判 fail 并冻结现场——EvidenceError 携带归因分类（hang_loading / streaming_stuck / reply_incomplete / content_unstable）、复现信息（操作序 + 会话 URL + 观察窗口）、1s 粒度信号时间线、冻结截图与半截上下文，进入失败事件的 evidence。自动重载/重试把偶发缺陷跑绿属于假通过，不做。
+- 失败即取证，禁止自愈（实现决策 2026-09-23）：卡死/半截渲染等 UI 缺陷本身就是被测对象，测试判 fail 并冻结现场——EvidenceError 携带归因分类（hang_loading / streaming_stuck / reply_incomplete / content_unstable / thinking_expand_failed）、复现信息（操作序 + 会话 URL + 观察窗口）、1s 粒度信号时间线、冻结截图与半截上下文，进入失败事件的 evidence。自动重载/重试把偶发缺陷跑绿属于假通过，不做。
 - 调试模式：`--apw-headed`（窗口可见）+ `--apw-slowmo MS`（动作放慢）CLI 覆盖环境配置；`run_debug.bat` 一键包装。
 
 ### 技术栈
@@ -117,7 +117,7 @@ Python 3.11+、Playwright（同步 API）、pytest、pytest-xdist、allure-pytes
   - 环境事实（2026-09-23）：正式环境**勿用于测试**；测试环境免登录直达 /chat，地址在本地 `configs/envs/test.yaml`（gitignored，模板 `test.example.yaml`）。
   - **敏感信息红线**（2026-09-23）：内网 URL/域名/IP/API/账号/产品名/个人信息不入库，提交与快照产物仅留占位符（`<test-host>`/`<org>`/`<product>`/`<user-*>`）。
   - 已知产品缺陷（2026-09-23，待产品侧修复）：会话区「加载对话历史中」偶发卡死不返回（后端 API 同期正常，指向前端状态机）；复现线索：新建会话 → 确认 Agent 类型弹窗 → 随即发送首条消息，时机不定。测试遇到即判 fail 并按失败取证流程留现场。
-  - Electron 可执行文件在 CI 上的获取方式（固定安装路径？构建产物下载？）与版本管理和 Playwright 兼容性。
+  - Electron 可执行文件在 CI 上的获取方式（固定安装路径？构建产物下载？）与版本管理和 Playwright 兼容性。（2026-10-08 本地实证：CDP attach 兼容无碍——Playwright `connect_over_cdp` 连 Electron 39/Chrome 142 客户端正常，真实用例 3 次绿跑；CI 获取方式仍开放。）
   - 内部 LLM 网关用于草稿生成的选型与配额。
 - 里程碑建议：M0 骨架（驱动双模式 + BasePage + 引擎 + JSON/Allure 报告 + 1 条手写 flow 跑通）→ M1 核心链路覆盖（20~50 条）→ M2 AI 生成流水线（爬虫 + 草稿 + 评审流程）→ M3 快照 diff/影响分析 + Judge 接入。
 - 本 spec 按用户选择落盘于仓库内 `docs/`，后续如接入 issue tracker 应迁移并打 `ready-for-agent` 标签。
@@ -152,3 +152,4 @@ Python 3.11+、Playwright（同步 API）、pytest、pytest-xdist、allure-pytes
 | D22 | 敏感红线机器门禁 | 红线两度返工（e659178 出库、2026-09-24 脱敏批）达「同类违规反复」阈值 → 入库文件扫描门禁 `tests/test_no_secrets.py`（内网 IP/凭据值/产品名），提交前随 `pytest tests` 强制执行（2026-09-24） |
 | D23 | 跨步骤动态身份锚 | flow YAML 静态，动态身份（刚创建的资源名、跳转落点）由页面对象写入 `BasePage.flow_state` 流程级共享状态、后续步骤读取（实证：对话并行切换 URL 锚、套组→操练场绑定）；断言只用归一化文本/语义属性（2026-09-28 起） |
 | D24 | AI 长任务完成判定 | 一律多信号收敛判完成（对话六信号；工作流/操练场运行=完成行+状态+统计+输入回显+输出行+日志稳定），单信号会被推理期/半截渲染误判；未达成即 EvidenceError 分类取证冻结现场，禁自愈重试（2026-09-30） |
+| D25 | 桌面端对话判定与思考块展开 | 桌面端完成判定 = 停止生成消失/回答气泡/Thought 块在场/操作行/稳定（流式结束稳定仍缺结构立即取证，不空等超时）；Thought 正文仅展开渲染 → 语义原语 `expand_thinking` 核对展开（`details[open]`+正文非空）；寒暄偶发走无思考快速路径整条缺 Thought 块（2026-10-08 实测 8 轮 2 例）→ 对话用例消息一律推理型保证渲染，缺失照判 fail 取证（2026-10-08） |

@@ -1,0 +1,75 @@
+# 桌面客户端会话页（Electron 打包 Web 界面，CDP attach 探查 2026-10-08）。
+# 真实应用无 data-testid；候选优先 data-guide-target/语义 aria-label 与结构类名。
+# 探查事实：组合器为 contenteditable 富输入（Enter 发送）；生成中发送键变「停止生成」
+# （button.btn-send.btn-stop.is-running）；回答完成态渲染 Thought 折叠块 + 气泡 + 操作行。
+page: desktop_chat
+locators:
+  - name: new_task_button
+    source: manual
+    candidates:
+      - { by: css, value: "button.btn-new-task" }
+      - { by: text, value: "新任务" }
+  - name: message_input
+    source: manual
+    candidates:
+      # contenteditable 富输入区（data-placeholder：Enter 发送，Shift+Enter 换行）
+      - { by: css, value: "[data-guide-target='composer-input']" }
+      - { by: css, value: "div.composer-input.composer-rich-input" }
+  - name: send_button
+    source: manual
+    candidates:
+      - { by: css, value: "form.composer button.btn-send" }
+  - name: stop_button
+    source: manual
+    candidates:
+      # 生成中发送键变停止键（btn-send btn-stop is-running，aria-label 停止生成）= 流式在场信号
+      - { by: css, value: "button.btn-send.btn-stop" }
+      - { by: css, value: "button[aria-label='停止生成']" }
+  - name: user_message
+    source: manual
+    candidates:
+      - { by: css, value: "div.message.user div.bubble" }
+  - name: assistant_reply
+    source: manual
+    candidates:
+      - { by: css, value: "div.message.assistant div.bubble.markdown-bubble" }
+      - { by: css, value: "div.message.assistant div.bubble" }
+  # ---- 完整回答的确定性结构标记（App 组件，不含 LLM 措辞）----
+  - name: thinking
+    source: manual
+    candidates:
+      # 思考过程折叠块（details.msg-thinking，「Thought」标签）——产品口径恒在场；
+      # 正文仅展开后渲染（collapsed 仅 summary）
+      - { by: css, value: "details.msg-thinking" }
+  - name: thinking_summary
+    source: manual
+    candidates:
+      # Thought 折叠块的展开触点（点击后 details 带 open）
+      - { by: css, value: "details.msg-thinking summary" }
+  - name: thinking_open
+    source: manual
+    candidates:
+      # 已展开的 Thought 块（details[open]）= 展开交互生效的状态标记
+      - { by: css, value: "details.msg-thinking[open]" }
+  - name: thinking_body
+    source: manual
+    candidates:
+      # 思考正文条目（.msg-thinking-body-item），展开才渲染且非空
+      - { by: css, value: "details.msg-thinking[open] div.msg-thinking-body-item" }
+      - { by: css, value: "div.msg-thinking-body-item" }
+  - name: reply_actions
+    source: manual
+    candidates:
+      # 完成态操作行（复制/从此处分叉/喜欢/不喜欢/朗读回复），锚定末条回答
+      - { by: css, value: "div.chat-turn:last-child div.msg-actions" }
+      - { by: css, value: "div.msg-actions" }
+  # ---- 观察用（不作判定锚点）----
+  - name: session_title
+    source: manual
+    candidates:
+      - { by: css, value: "button.chat-title-trigger .chat-title-text" }
+  - name: conv_row
+    source: manual
+    candidates:
+      # 侧边栏会话行（span.conv-title 为标题；标题生成中带 .is-generating）
+      - { by: css, value: "div.conv-item" }

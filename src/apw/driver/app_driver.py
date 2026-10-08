@@ -86,4 +86,10 @@ class AppDriver:
         return self._page
 
     def goto_base(self) -> Page:
+        if self.env.driver.mode == "electron":
+            # 桌面客户端启动即在其 UI（file:// 包内页面），无 base_url 时不导航；
+            # 配了 base_url 则当作客户端内起始路由（如会话首页）用。
+            if not self.env.base_url:
+                return self.page
+            return self.page.goto(self.env.base_url, wait_until="domcontentloaded")
         return self.page.goto(resolve_base_url(self.env, self.root))

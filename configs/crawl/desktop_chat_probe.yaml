@@ -1,0 +1,14 @@
+# 桌面客户端（Electron 打包 Web 界面）对话链路首轮探查（生成侧资产）。
+# 目标：摸清启动态 → 对话页 → 新建会话 → 发送/回复各状态的结构与定位器候选。
+# 探查期用 probe 保留名通用原语推进状态；定位器与页面对象产品化后步骤替换为 page: <页面名>。
+# 产物入 .scratch/autoPlayWright/snapshots/desktop/（gitignored，落盘自动脱敏）。
+name: desktop-chat-probe
+targets:
+  - id: desktop-chat-boot
+    route: ""
+    steps:
+      - do: { page: probe, action: wait, args: { ms: 3000 } }
+        label: app_boot
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "desktop_boot" } }
+        label: dom_boot

@@ -1,0 +1,26 @@
+# 桌面客户端冒烟（Electron 打包 Web 界面，CDP attach 执行）：
+# 新建任务 → 发送消息 → 完整回答六信号判定 → Thought 折叠块展开核对。
+# 断言全部为确定性内容（组件渲染/交互状态/用户输入回显），不断言 LLM 措辞。
+meta:
+  id: desktop-chat-smoke
+  name: 桌面端冒烟：新建任务发送消息并展开 Thought
+  platforms: [desktop]
+  envs: [desktop]
+  tags: [P0, smoke]
+  owner: qa
+steps:
+  - do: { page: desktop_chat, action: new_task, args: {} }
+  # 推理型消息：保证思考块渲染（纯寒暄偶发走 ~2s 无思考快速路径，Thought 块整条缺失）
+  - do: { page: desktop_chat, action: send_message, args: { text: "请分步推理后回答：127 是质数吗？" } }
+  - do: { page: desktop_chat, action: wait_reply_done, args: { timeout_ms: 120000 } }
+  - do: { page: desktop_chat, action: expand_thinking, args: {} }
+  - do: { page: desktop_chat, action: capture_context, args: {} }
+  - assert: { type: visible, page: desktop_chat, target: user_message }
+  - assert: { type: text_contains, page: desktop_chat, target: user_message, expected: "127" }
+  - assert: { type: visible, page: desktop_chat, target: assistant_reply }
+  - assert: { type: visible, page: desktop_chat, target: thinking }
+  # 展开核对：details[open] 生效 + 思考正文渲染（正文仅展开时渲染）
+  - assert: { type: visible, page: desktop_chat, target: thinking_open }
+  - assert: { type: visible, page: desktop_chat, target: thinking_body }
+  - assert: { type: visible, page: desktop_chat, target: reply_actions }
+  - judge: { note: "v1 预留：回复内容质量由 LLM-as-Judge 判定" }

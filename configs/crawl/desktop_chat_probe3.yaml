@@ -1,0 +1,10 @@
+# 桌面客户端 Thought 块专项探查（生成侧资产）：
+# 1) 核对 Thought 块在不同回复轮次的真实标记（是否恒在场/形态差异）
+# 2) 探查展开交互（summary 点击后 details[open] 与思考正文渲染）
+name: desktop-chat-probe3
+targets:
+  - id: desktop-thinking-markup
+    route: ""
+    steps:
+      - do: { page: probe, action: dump_dom, args: { name: "desktop_current" } }
+        label: dom_current

@@ -1,0 +1,46 @@
+# 桌面客户端对话链路第二轮探查（生成侧资产）：活体走一遍发消息，
+# 采集 新任务 → 输入 → 发送 → 生成中 → 完成 各状态结构（定位器/完成信号候选）。
+# 产物入 .scratch/autoPlayWright/snapshots/desktop/（gitignored，落盘自动脱敏）。
+name: desktop-chat-probe2
+targets:
+  - id: desktop-chat-turn
+    route: ""
+    steps:
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "button.btn-new-task" }, timeout_ms: 5000 } }
+        label: new_task
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "desktop_new_task" } }
+        label: dom_new_task
+      - do: { page: probe, action: type, args: { selector: { by: css, value: "[data-guide-target='composer-input']" }, text: "你好，请用一句话做个自我介绍" } }
+        label: typed
+        capture: true
+      - do: { page: probe, action: press, args: { key: "Enter" } }
+        label: sent
+      - do: { page: probe, action: wait, args: { ms: 2000 } }
+        label: sending_state
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "desktop_sending" } }
+        label: dom_sending
+      - do: { page: probe, action: wait, args: { ms: 8000 } }
+        label: streaming_state
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "desktop_streaming" } }
+        label: dom_streaming
+      - do: { page: probe, action: wait, args: { ms: 45000 } }
+        label: done_state
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "desktop_done" } }
+        label: dom_done
+    signals:
+      - name: stop_button
+        selector: { by: text, value: 停止 }
+      - name: send_button
+        selector: { by: css, value: "button.btn-send" }
+      - name: user_bubble
+        selector: { by: css, value: "div.message.user div.bubble" }
+      - name: assistant_bubble
+        selector: { by: css, value: "div.message.assistant div.bubble" }
+      - name: msg_actions
+        selector: { by: css, value: "div.msg-actions" }
+      - name: thinking
+        selector: { by: css, value: "details.msg-thinking" }

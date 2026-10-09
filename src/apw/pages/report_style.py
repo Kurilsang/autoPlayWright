@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import time
 
-from apw.pages.base import BasePage, EvidenceError
+from apw.pages.base import BasePage
 
 _DISMISS_TEXTS = ("稍后再看", "我已熟悉", "关闭提示", "我已知晓")
 
@@ -52,16 +52,13 @@ class ReportStylePage(BasePage):
         if variant:
             hit = cards.filter(has_text=variant)
             if hit.count() == 0:
-                shot = self.snap("card-missing")
-                raise EvidenceError(
-                    f"样式卡未找到［归因: run_incomplete］变体 {variant!r} 不在当前列表\n"
-                    f"  复现: url={self.page.url}\n  冻结截图: {shot or '（未捕获）'}",
-                    {
-                        "classification": "run_incomplete",
-                        "cause": "目标样式卡不存在（筛选结果里没有该变体）",
-                        "repro": {"url": self.page.url, "variant": variant},
-                        "screenshots": [shot] if shot else [],
-                    },
+                self.fail_evidence(
+                    "样式卡未找到",
+                    classification="run_incomplete",
+                    cause="目标样式卡不存在（筛选结果里没有该变体）",
+                    repro={"url": self.page.url, "variant": variant},
+                    detail=f"变体 {variant!r} 不在当前列表",
+                    shot_name="card-missing",
                 )
             return hit
         return cards.nth(card_index)
@@ -111,21 +108,17 @@ class ReportStylePage(BasePage):
         self.loc("nav_more_scenes").click()
         self.page.wait_for_timeout(600)
         self.loc("nav_report_style").click()
-        deadline = time.time() + timeout_ms / 1000
-        while self.count("style_card") == 0 and time.time() < deadline:
-            time.sleep(0.4)
+        self.wait_until(
+            lambda: self.count("style_card") > 0, timeout_ms=timeout_ms, interval_ms=400
+        )
         if self.count("style_card") == 0:
-            shot = self.snap("library-not-loaded")
-            raise EvidenceError(
-                "报告样式库未进入［归因: run_stuck］样式卡未渲染"
-                f"（{timeout_ms}ms）\n  复现: url={self.page.url}\n"
-                f"  冻结截图: {shot or '（未捕获）'}",
-                {
-                    "classification": "run_stuck",
-                    "cause": "报告样式库列表未渲染",
-                    "repro": {"url": self.page.url},
-                    "screenshots": [shot] if shot else [],
-                },
+            self.fail_evidence(
+                "报告样式库未进入",
+                classification="run_stuck",
+                cause="报告样式库列表未渲染",
+                repro={"url": self.page.url},
+                detail=f"样式卡未渲染（{timeout_ms}ms）",
+                shot_name="library-not-loaded",
             )
         return {
             "surface": "report_style_library",
@@ -146,28 +139,26 @@ class ReportStylePage(BasePage):
         """
         chips = self.loc("tag_bar").get_by_text(label, exact=True)
         if chips.count() != 1:
-            shot = self.snap("tag-missing")
-            raise EvidenceError(
-                f"标签筛选未执行［归因: run_incomplete］标签 {label!r} 命中 {chips.count()} 处\n"
-                f"  复现: url={self.page.url}\n  冻结截图: {shot or '（未捕获）'}",
-                {
-                    "classification": "run_incomplete",
-                    "cause": "目标筛选标签不存在或有歧义",
-                    "repro": {"url": self.page.url, "label": label},
-                    "screenshots": [shot] if shot else [],
-                },
+            self.fail_evidence(
+                "标签筛选未执行",
+                classification="run_incomplete",
+                cause="目标筛选标签不存在或有歧义",
+                repro={"url": self.page.url, "label": label},
+                detail=f"标签 {label!r} 命中 {chips.count()} 处",
+                shot_name="tag-missing",
             )
         chips.first.click()
-        deadline = time.time() + timeout_ms / 1000
         active = ""
-        while time.time() < deadline:
-            time.sleep(0.3)
+
+        def active_is_label() -> bool:
+            nonlocal active
             try:
                 active = self.loc("tag_chip_active").first.inner_text(timeout=1_000).strip()
             except Exception:  # noqa: BLE001 - 激活态读取失败继续等
                 active = ""
-            if active == label:
-                break
+            return active == label
+
+        self.wait_until(active_is_label, timeout_ms=timeout_ms, interval_ms=300)
         sections = [
             t.strip() for t in self.loc_all("style_section_title").all_inner_texts() if t.strip()
         ]
@@ -183,13 +174,15 @@ class ReportStylePage(BasePage):
             "cards": cards,
         }
         if active != label or not filtered_ok or cards == 0:
-            shot = self.snap("tag-filter-mismatch")
-            evidence["screenshots"] = [shot] if shot else []
-            raise EvidenceError(
-                f"标签筛选未生效［归因: run_incomplete］期望激活 {label!r} 且分组收敛，"
-                f"实际 active={active!r} sections={sections} cards={cards}\n"
-                f"  复现: 标签切换 @ {self.page.url}\n  冻结截图: {shot or '（未捕获）'}",
-                evidence,
+            self.fail_evidence(
+                "标签筛选未生效",
+                classification="run_incomplete",
+                cause="期望激活标签且分组收敛，实际不符",
+                repro={"url": self.page.url, "observed": "标签切换"},
+                detail=f"期望激活 {label!r}，实际 active={active!r} "
+                f"sections={sections} cards={cards}",
+                shot_name="tag-filter-mismatch",
+                extra=evidence,
             )
         return evidence
 
@@ -199,9 +192,9 @@ class ReportStylePage(BasePage):
         """卡片「预览」→ 预览弹层打开且头部回显变体标识（弹层含全页样式 iframe）。"""
         card = self._card(variant, card_index)
         card.first.get_by_text("预览", exact=True).first.click()
-        deadline = time.time() + timeout_ms / 1000
-        while self.count("preview_modal") == 0 and time.time() < deadline:
-            time.sleep(0.3)
+        self.wait_until(
+            lambda: self.count("preview_modal") > 0, timeout_ms=timeout_ms, interval_ms=300
+        )
         modal_text = (
             self.loc("preview_modal").first.inner_text(timeout=1_500)
             if self.count("preview_modal")
@@ -227,33 +220,32 @@ class ReportStylePage(BasePage):
             **checks,
         }
         if not all(checks.values()):
-            shot = self.snap("preview-mismatch")
-            evidence["screenshots"] = [shot] if shot else []
-            raise EvidenceError(
-                f"预览弹层未正常打开［归因: run_incomplete］{checks}\n"
-                f"  复现: 预览 {variant or f'card[{card_index}]'} @ {self.page.url}\n"
-                f"  冻结截图: {shot or '（未捕获）'}",
-                evidence,
+            self.fail_evidence(
+                "预览弹层未正常打开",
+                classification="run_incomplete",
+                cause="弹层/头部回显/iframe 核对未全过",
+                repro={
+                    "url": self.page.url,
+                    "observed": f"预览 {variant or f'card[{card_index}]'}",
+                },
+                detail=f"checks={checks}",
+                shot_name="preview-mismatch",
+                extra=evidence,
             )
         return evidence
 
     def close_preview(self, timeout_ms: int = 8_000) -> dict:
         """关闭预览弹层（弹层头部「关闭」按钮），等弹层消失。"""
         self.loc("preview_close_button").first.click()
-        deadline = time.time() + timeout_ms / 1000
-        while self.count("preview_modal") and time.time() < deadline:
-            time.sleep(0.3)
+        self.wait_until(lambda: self.count("preview_modal") == 0, timeout_ms=timeout_ms)
         if self.count("preview_modal"):
-            shot = self.snap("preview-not-closed")
-            raise EvidenceError(
-                "预览弹层未关闭［归因: run_stuck］点击「关闭」后弹层仍在\n"
-                f"  复现: url={self.page.url}\n  冻结截图: {shot or '（未捕获）'}",
-                {
-                    "classification": "run_stuck",
-                    "cause": "预览弹层关闭失败",
-                    "repro": {"url": self.page.url},
-                    "screenshots": [shot] if shot else [],
-                },
+            self.fail_evidence(
+                "预览弹层未关闭",
+                classification="run_stuck",
+                cause="预览弹层关闭失败",
+                repro={"url": self.page.url},
+                detail="点击「关闭」后弹层仍在",
+                shot_name="preview-not-closed",
             )
         return {"preview_closed": True, "closed_by": "close_button"}
 
@@ -276,9 +268,7 @@ class ReportStylePage(BasePage):
         self.flow_state["work_page"] = work
         self.page = work  # 本动作后续操作也作用于工作窗口
         self._dismiss_popups()
-        deadline = time.time() + 10
-        while self._title_value() == "" and time.time() < deadline:
-            time.sleep(0.4)
+        self.wait_until(lambda: self._title_value() != "", timeout_ms=10_000, interval_ms=400)
         name = self._title_value()
         url = self.page.url
         checks = {
@@ -295,12 +285,14 @@ class ReportStylePage(BasePage):
         }
         if not all(checks.values()):
             category = "identity_mismatch" if checks["jumped"] else "run_stuck"
-            shot = self.snap("copy-jump-mismatch")
-            evidence["screenshots"] = [shot] if shot else []
-            raise EvidenceError(
-                f"做同款跳转未达成［归因: {category}］{checks}\n"
-                f"  复现: 弹层做同款 → 编辑器 @ {url}\n  冻结截图: {shot or '（未捕获）'}",
-                evidence,
+            self.fail_evidence(
+                "做同款跳转未达成",
+                classification=category,
+                cause="跳转后编辑器/副本名校验未全过",
+                repro={"url": url, "observed": "弹层做同款 → 编辑器"},
+                detail=f"checks={checks}",
+                shot_name="copy-jump-mismatch",
+                extra=evidence,
             )
         return evidence
 
@@ -319,19 +311,16 @@ class ReportStylePage(BasePage):
                 except Exception:  # noqa: BLE001 - 加载未完成也接管，后续就绪校验兜底
                     pass
                 return work, "popup"
-            self.page.wait_for_timeout(300)  # API 调用泵事件，URL/弹窗事件才会推进
+            self.settle(300)  # 泵事件，URL/弹窗事件才会推进
             if "/workflows/" in self.page.url:
                 return self.page, "same_tab"
-        shot = self.snap("copy-no-jump")
-        raise EvidenceError(
-            f"做同款未跳转［归因: run_stuck］{timeout_ms}ms 内无新窗口且 URL 未进工作流编辑器\n"
-            f"  复现: 弹层做同款 @ {self.page.url}\n  冻结截图: {shot or '（未捕获）'}",
-            {
-                "classification": "run_stuck",
-                "cause": "「做同款」未产生跳转（无弹窗且同页未导航）",
-                "repro": {"url": self.page.url},
-                "screenshots": [shot] if shot else [],
-            },
+        self.fail_evidence(
+            "做同款未跳转",
+            classification="run_stuck",
+            cause="「做同款」未产生跳转（无弹窗且同页未导航）",
+            repro={"url": self.page.url},
+            detail=f"{timeout_ms}ms 内无新窗口且 URL 未进工作流编辑器",
+            shot_name="copy-no-jump",
         )
 
     # ---- 运行：AI 长任务，完成判定六信号 + 工作区最终结果 ----
@@ -347,77 +336,57 @@ class ReportStylePage(BasePage):
         try:
             self.loc("run_button").click(timeout=5_000)
         except Exception as exc:  # noqa: BLE001 - 运行未启动即取证
-            shot = self.snap("run-not-started")
-            raise EvidenceError(
-                "运行未启动［归因: not_ready］「运行」不可用",
-                {
-                    "classification": "not_ready",
-                    "cause": "「运行」按钮不可用",
-                    "repro": {"url": self.page.url, "steps": "run_workflow"},
-                    "screenshots": [shot] if shot else [],
-                },
-            ) from exc
-        deadline = time.time() + timeout_ms / 1000
-        stable, last_len, signals, prev, tick = 0, -1, {}, None, 0
-        timeline: list[dict] = []
-        while time.time() < deadline:
-            time.sleep(1)
-            tick += 1
-            signals = {
+            self.fail_evidence(
+                "运行未启动",
+                classification="not_ready",
+                cause="「运行」按钮不可用",
+                repro={"url": self.page.url, "steps": "run_workflow"},
+                shot_name="run-not-started",
+                from_exc=exc,
+            )
+        watch = self.watch_signals(
+            signals=lambda: {
                 "cancel_cleared": self.count("cancel_run_button") == 0,
                 "done_line": self.count("run_done_marker") > 0,
                 "output_keys": self.count("run_output_keys_marker") > 0,
                 "status_completed": self.count("run_status_badge") > 0,
                 "artifacts_landed": (
-                    self.count("artifacts_placeholder") == 0 and len(self._artifact_names()) > 0
+                    self.count("artifacts_placeholder") == 0
+                    and len(self._artifact_names()) > 0
                 ),
-            }
-            length = self._log_length()
-            if signals != prev or tick % 10 == 0:
-                timeline.append({"t_s": tick, "log_len": length, **signals})
-                prev = dict(signals)
-            if all(signals.values()) and length == last_len and length > 0:
-                stable += 1
-                if stable >= 3:  # ⑥ 日志稳定
-                    return self._run_evidence(signals, timeline)
-            else:
-                stable = 0
-            last_len = length
-        category, cause = classify_run_failure(signals)
-        shot = self.snap("run-timeout")
-        evidence = self._run_evidence(signals, timeline)
-        evidence.update(
-            {
-                "classification": category,
-                "cause": cause,
-                "repro": {
-                    "url": self.page.url,
-                    "observed": f"运行启动后 {timeout_ms}ms 内完成信号未达成",
-                    "steps": "copy_template → run_workflow",
-                },
-                "screenshots": [shot] if shot else [],
-            }
+            },
+            size=self._log_length,
+            timeout_ms=timeout_ms,
+            size_field="log_len",
         )
-        raise EvidenceError(
-            f"运行未达成［归因: {category}］{cause}\n  信号: {signals}\n"
-            f"  冻结截图: {shot or '（未捕获）'}",
-            evidence,
+        if watch.settled:  # ⑥ 日志稳定（watch 内已多信号收敛）
+            return self._run_evidence(watch.signals, watch.timeline)
+        self.fail_incomplete(
+            "运行未达成",
+            classify=classify_run_failure,
+            watch=watch,
+            steps="copy_template → run_workflow",
+            observed=f"运行启动后 {timeout_ms}ms 内完成信号未达成",
+            shot_name="run-timeout",
+            extra=self._run_facts(),
         )
 
-    def _run_evidence(self, signals: dict, timeline: list[dict]) -> dict:
+    def _run_facts(self) -> dict:
+        """运行现场事实（日志尾/产物/名称/URL）：成功证据与失败取证共用。"""
         log_tail = ""
         try:
             log_tail = self.loc("run_log").inner_text(timeout=1_500)[-600:]
         except Exception:  # noqa: BLE001 - 证据尽力而为
             pass
         return {
-            "run_signals": signals,
-            "timeline": timeline[-5:],
             "log_tail": log_tail,
             "artifacts": self._artifact_names(),
             "workflow_name": self._title_value(),
             "url": self.page.url.split("?")[0],
         }
+
+    def _run_evidence(self, signals: dict, timeline: list[dict]) -> dict:
+        return {"run_signals": signals, "timeline": timeline[-5:], **self._run_facts()}
 
     def verify_artifacts(self, min_count: int = 1) -> dict:
         """工作区最终结果核对：「工作流产物」区「· 产物」行 ≥ min_count。
@@ -431,12 +400,13 @@ class ReportStylePage(BasePage):
             "rows_total": self.count("artifact_row"),
         }
         if len(artifacts) < min_count:
-            shot = self.snap("artifacts-missing")
-            evidence["screenshots"] = [shot] if shot else []
-            raise EvidenceError(
-                f"工作区最终结果缺失［归因: run_incomplete］「· 产物」行 "
-                f"{len(artifacts)} < {min_count}\n  复现: url={self.page.url}\n"
-                f"  冻结截图: {shot or '（未捕获）'}",
-                evidence,
+            self.fail_evidence(
+                "工作区最终结果缺失",
+                classification="run_incomplete",
+                cause="「· 产物」行不足，最终结果未在工作区落位",
+                repro={"url": self.page.url, "observed": "verify_artifacts"},
+                detail=f"「· 产物」行 {len(artifacts)} < {min_count}",
+                shot_name="artifacts-missing",
+                extra=evidence,
             )
         return evidence

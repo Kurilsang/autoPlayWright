@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import time
 
-from apw.pages.base import BasePage, EvidenceError
+from apw.pages.base import BasePage, SignalWatch
 
 _DISMISS_TEXTS = ("稍后再看", "我已熟悉", "关闭提示", "关闭", "我已知晓")
 
@@ -114,10 +114,11 @@ class AmlChatPage(BasePage):
         弹窗是全屏遮罩（fixed inset-0），出现时盖住会话区、拦截点击，
         且出现时机有延迟；在 timeout_ms 内等待，未出现视为本会话已选过。
         """
-        deadline = time.time() + timeout_ms / 1000
-        while self.count("agent_mode_dialog") == 0 and time.time() < deadline:
-            time.sleep(0.5)
-        if self.count("agent_mode_dialog") == 0:
+        if not self.wait_until(
+            lambda: self.count("agent_mode_dialog") > 0,
+            timeout_ms=timeout_ms,
+            interval_ms=500,
+        ):
             return
         if mode not in _MODE_LOCATORS:
             raise ValueError(
@@ -125,9 +126,9 @@ class AmlChatPage(BasePage):
             )
         self.loc(_MODE_LOCATORS[mode]).click()
         self.loc("agent_mode_confirm").click()
-        close_deadline = time.time() + 5
-        while self.count("agent_mode_dialog") and time.time() < close_deadline:
-            time.sleep(0.3)
+        self.wait_until(
+            lambda: self.count("agent_mode_dialog") == 0, timeout_ms=5_000, interval_ms=300
+        )
 
     def new_session(self) -> None:
         self.loc("new_chat_button").click()
@@ -160,27 +161,25 @@ class AmlChatPage(BasePage):
 
         switched_by = ""
         row_budget = min(timeout_ms / 1000, 12)
-        deadline = time.time() + row_budget
-        while title and time.time() < deadline:
-            rows = self.loc_all("session_row").filter(has_text=title)
-            if rows.count():
-                rows.first.click()
-                switched_by = "row_click"
-                break
-            time.sleep(0.5)
+        if title and self.wait_until(
+            lambda: self.loc_all("session_row").filter(has_text=title).count() > 0,
+            timeout_ms=int(row_budget * 1000),
+            interval_ms=500,
+        ):
+            self.loc_all("session_row").filter(has_text=title).first.click()
+            switched_by = "row_click"
         if not switched_by:
             if not recorded_url:
-                shot = self.snap("session-switch-no-anchor")
-                raise EvidenceError(
-                    f"会话未切换［归因: identity_mismatch］无可用锚点：tag={key!r} 无记录 URL，"
-                    f"标题 {title!r} 的会话行 {row_budget:.0f}s 内也未出现\n"
-                    f"  复现: url={self.page.url}\n  冻结截图: {shot or '（未捕获）'}",
-                    {
-                        "classification": "identity_mismatch",
-                        "cause": "切换目标无锚点（标题未生效且无记录 URL）",
-                        "repro": {"url": self.page.url, "tag": key, "title": title},
-                        "screenshots": [shot] if shot else [],
-                    },
+                self.fail_evidence(
+                    "会话未切换：无可用锚点",
+                    classification="identity_mismatch",
+                    cause="切换目标无锚点（标题未生效且无记录 URL）",
+                    repro={"url": self.page.url, "tag": key, "title": title},
+                    detail=(
+                        f"tag={key!r} 无记录 URL，标题 {title!r} 的会话行 "
+                        f"{row_budget:.0f}s 内也未出现"
+                    ),
+                    shot_name="session-switch-no-anchor",
                 )
             self.page.goto(recorded_url, wait_until="domcontentloaded")
             switched_by = "goto_url"
@@ -214,7 +213,7 @@ class AmlChatPage(BasePage):
                 break
             if time.time() >= deadline:
                 break
-            time.sleep(0.5)
+            self.settle(500)
         loading = self.count("history_loading") > 0
         deferred = bool(url_ok and forbid_ok and not expect_ok and (msgs == 0 or loading))
         evidence = {
@@ -231,14 +230,18 @@ class AmlChatPage(BasePage):
         if deferred:
             return evidence  # 内容未渲染完：放行，最终回答完成判定接力核验
         if not (url_ok and expect_ok and forbid_ok):
-            shot = self.snap("session-switch-mismatch")
-            evidence["screenshots"] = [shot] if shot else []
-            raise EvidenceError(
-                f"会话切换串台［归因: identity_mismatch］期望 {key!r}："
-                f"url_ok={url_ok}（{now_url} vs {recorded_url}），"
-                f"expect_found={expect_ok}，forbid_found={not forbid_ok}，顶栏={header.strip()!r}\n"
-                f"  复现: 切换后身份三点核对未过\n  冻结截图: {shot or '（未捕获）'}",
-                evidence,
+            self.fail_evidence(
+                f"会话切换串台：期望 {key!r}",
+                classification="identity_mismatch",
+                cause="切换后身份三点核对未过",
+                repro={"url": self.page.url, "observed": "切换后身份三点核对未过"},
+                detail=(
+                    f"url_ok={url_ok}（{now_url} vs {recorded_url}），"
+                    f"expect_found={expect_ok}，forbid_found={not forbid_ok}，"
+                    f"顶栏={header.strip()!r}"
+                ),
+                shot_name="session-switch-mismatch",
+                extra=evidence,
             )
         return evidence
 
@@ -266,22 +269,18 @@ class AmlChatPage(BasePage):
         self, ready_timeout_ms: int = 30_000, phase: str = "send_message"
     ) -> None:
         """等会话区「加载对话历史中」占位清除；持续卡住即冻结取证（hang_loading）。"""
-        deadline = time.time() + ready_timeout_ms / 1000
-        while self.count("history_loading") and time.time() < deadline:
-            time.sleep(0.3)
-        if self.count("history_loading"):
-            shot = self.snap("history-hang")
-            raise EvidenceError(
-                f"会话区未就绪［归因: hang_loading］持续「加载对话历史中」"
-                f"（{ready_timeout_ms}ms），页面保持原状待查\n"
-                f"  复现: url={self.page.url}，观察: {phase} 阶段\n"
-                f"  冻结截图: {shot or '（未捕获）'}",
-                {
-                    "classification": "hang_loading",
-                    "cause": "会话区持续「加载对话历史中」，操作被阻塞",
-                    "repro": {"url": self.page.url, "observed": f"{phase} 阶段"},
-                    "screenshots": [shot] if shot else [],
-                },
+        if not self.wait_until(
+            lambda: self.count("history_loading") == 0,
+            timeout_ms=ready_timeout_ms,
+            interval_ms=300,
+        ):
+            self.fail_evidence(
+                "会话区未就绪：持续「加载对话历史中」",
+                classification="hang_loading",
+                cause="会话区持续「加载对话历史中」，操作被阻塞",
+                repro={"url": self.page.url, "observed": f"{phase} 阶段"},
+                detail=f"占位持续 {ready_timeout_ms}ms，页面保持原状待查",
+                shot_name="history-hang",
             )
 
     def wait_reply_done(self, timeout_ms: int = 120_000) -> None:
@@ -299,76 +298,43 @@ class AmlChatPage(BasePage):
         失败携带归因分类、复现信息、信号时间线、冻结截图与半截上下文，
         经 EvidenceError.evidence 进报告，供归因总结与复现跟进。
         """
-        t0 = time.time()
-        deadline = t0 + timeout_ms / 1000
-        stable, last_len, signals, prev = 0, -1, {}, None
-        timeline: list[dict] = []
         hang_since: float | None = None
         hang_shot = ""
-        tick = 0
-        while time.time() < deadline:
-            time.sleep(1)
-            tick += 1
-            signals = {
+
+        def on_tick(w: SignalWatch) -> None:
+            nonlocal hang_since, hang_shot
+            if not w.signals.get("history_cleared", True):
+                hang_since = hang_since if hang_since is not None else w.elapsed_s
+                if not hang_shot and w.elapsed_s - hang_since > 10:
+                    hang_shot = self.snap("hang-onset")  # 卡死现场冻结
+            else:
+                hang_since = None
+
+        watch = self.watch_signals(
+            signals=lambda: {
                 "stop_cleared": self.count("stop_button") == 0,
                 "reasoning_steps": self.count("reasoning_steps") > 0,
                 "final_answer_card": self.count("final_answer_card") > 0,
                 "reply_actions": self.count("reply_actions") > 0,
                 "history_cleared": self.count("history_loading") == 0,
-            }
-            length = self.page.evaluate(
+            },
+            size=lambda: self.page.evaluate(
                 "() => { const m = document.querySelector('main');"
                 " return m ? (m.innerText || '').length : 0; }"
-            )
-            if signals != prev or tick % 10 == 0:
-                timeline.append({"t_s": tick, "text_len": length, **signals})
-                prev = dict(signals)
-            if not signals["history_cleared"]:
-                hang_since = hang_since or time.time()
-                if not hang_shot and time.time() - hang_since > 10:
-                    hang_shot = self.snap("hang-onset")  # 卡死现场冻结
-            else:
-                hang_since = None
-            if all(signals.values()) and length == last_len and length > 0:
-                stable += 1
-                if stable >= 3:
-                    return
-            else:
-                stable = 0
-            last_len = length
-        self._fail_incomplete(signals, timeline, timeout_ms, hang_shot)
-
-    def _fail_incomplete(
-        self, signals: dict, timeline: list[dict], timeout_ms: int, hang_shot: str
-    ) -> None:
-        """完整回答未达成：归因分类 + 复现信息 + 冻结取证，抛 EvidenceError。"""
-        category, cause = classify_incomplete(signals)
-        shots = [s for s in (hang_shot, self.snap("timeout")) if s]
-        repro = {
-            "url": self.page.url,
-            "observed": f"send_message 后 {timeout_ms}ms 内完整回答未达成",
-            "steps": "new_session → select_agent_mode → send_message → wait_reply_done",
-        }
-        evidence: dict = {
-            "classification": category,
-            "cause": cause,
-            "signals": signals,
-            "timeline": timeline,
-            "repro": repro,
-            "screenshots": shots,
-        }
-        try:
-            evidence.update(self.capture_context())  # 半截上下文一并取证
-        except Exception:  # noqa: BLE001 - 取证尽力而为
-            pass
-        summary = (
-            f"完整回答未达成［归因: {category}］{cause}\n"
-            f"  信号: {signals}\n"
-            f"  时间线: {len(timeline)} 个采样点（1s 粒度，0..{timeout_ms // 1000}s）\n"
-            f"  复现: {repro['steps']} @ {repro['url']}，观察: {repro['observed']}\n"
-            f"  冻结截图: {', '.join(shots) if shots else '（未捕获）'}"
+            ),
+            timeout_ms=timeout_ms,
+            on_tick=on_tick,
         )
-        raise EvidenceError(summary, evidence)
+        if watch.settled:
+            return
+        self.fail_incomplete(
+            "完整回答未达成",
+            classify=classify_incomplete,
+            watch=watch,
+            steps="new_session → select_agent_mode → send_message → wait_reply_done",
+            observed=f"send_message 后 {timeout_ms}ms 内完整回答未达成",
+            freeze_shots=[hang_shot],
+        )
 
     def capture_context(self) -> dict:
         """采集完整对话上下文：用户输入 + 推理步骤 + 思考过程 + 最终答案。

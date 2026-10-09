@@ -7,9 +7,7 @@
 """
 from __future__ import annotations
 
-import time
-
-from apw.pages.base import BasePage, EvidenceError
+from apw.pages.base import BasePage, SignalWatch
 
 # 结构采集专用 DOM 内省：按语义标记取对话上下文（容忍样式改名，尽力而为）
 _CAPTURE_JS = """
@@ -95,21 +93,18 @@ class DesktopChatPage(BasePage):
         后续判定会串台——判失败冻结取证（不自愈）。
         """
         self.loc("new_task_button").click()
-        deadline = time.time() + ready_timeout_ms / 1000
-        while self.count("user_message") and time.time() < deadline:
-            self.page.wait_for_timeout(300)
-        if self.count("user_message"):
-            shot = self.snap("new-task-not-fresh")
-            raise EvidenceError(
-                f"新建任务未清空会话区［归因: identity_mismatch］仍有历史消息"
-                f"（{ready_timeout_ms}ms），页面原状冻结\n"
-                f"  复现: 点击「新任务」后会话区未重置\n  冻结截图: {shot or '（未捕获）'}",
-                {
-                    "classification": "identity_mismatch",
-                    "cause": "新任务未清空会话区，旧会话残留会串台",
-                    "repro": {"observed": "new_task 后 user_message 仍在场"},
-                    "screenshots": [shot] if shot else [],
-                },
+        if not self.wait_until(
+            lambda: self.count("user_message") == 0,
+            timeout_ms=ready_timeout_ms,
+            interval_ms=300,
+        ):
+            self.fail_evidence(
+                "新建任务未清空会话区：仍有历史消息",
+                classification="identity_mismatch",
+                cause="新任务未清空会话区，旧会话残留会串台",
+                repro={"observed": "new_task 后 user_message 仍在场"},
+                detail=f"「新任务」后 {ready_timeout_ms}ms 会话区未重置，页面原状冻结",
+                shot_name="new-task-not-fresh",
             )
         return {"new_task": "cleared"}
 
@@ -136,49 +131,44 @@ class DesktopChatPage(BasePage):
         """
         state = self.page.evaluate(_THINKING_JS)
         if not state.get("count"):
-            shot = self.snap("thinking-missing")
-            raise EvidenceError(
-                "Thought 块缺失［归因: reply_incomplete］末条回答无 details.msg-thinking，"
-                "无法展开（产品口径应恒在场），页面原状冻结\n"
-                f"  复现: url={self.page.url}\n  冻结截图: {shot or '（未捕获）'}",
-                {
-                    "classification": "reply_incomplete",
-                    "cause": "Thought 折叠块缺失，展开无从谈起",
-                    "repro": {"url": self.page.url, "observed": "expand_thinking 前置检查"},
-                    "screenshots": [shot] if shot else [],
-                },
+            self.fail_evidence(
+                "Thought 块缺失：无法展开",
+                classification="reply_incomplete",
+                cause="Thought 折叠块缺失，展开无从谈起",
+                repro={"url": self.page.url, "observed": "expand_thinking 前置检查"},
+                detail="末条回答无 details.msg-thinking（产品口径应恒在场），页面原状冻结",
+                shot_name="thinking-missing",
             )
         if not (state["last"] or {}).get("body_text"):
             try:
                 self.loc_all("thinking_summary").last.click()
             except Exception:  # noqa: BLE001 - 点击失败走下方统一取证
                 pass
-            deadline = time.time() + timeout_ms / 1000
-            while time.time() < deadline:
+
+            def body_rendered() -> bool:
+                nonlocal state
                 state = self.page.evaluate(_THINKING_JS)
-                if (state["last"] or {}).get("body_text"):
-                    break
-                self.page.wait_for_timeout(200)
+                return bool((state["last"] or {}).get("body_text"))
+
+            self.wait_until(body_rendered, timeout_ms=timeout_ms, interval_ms=200)
         last = state.get("last") or {}
         if not (last.get("open") and last.get("body_text")):
-            shot = self.snap("thinking-expand-failed")
-            raise EvidenceError(
-                f"Thought 展开未生效［归因: thinking_expand_failed］"
-                f"open={last.get('open')}，正文字符数={len(last.get('body_text') or '')}"
-                f"（点击 summary 后 {timeout_ms}ms 内未渲染思考正文），页面原状冻结\n"
-                f"  复现: url={self.page.url}\n  冻结截图: {shot or '（未捕获）'}",
-                {
-                    "classification": "thinking_expand_failed",
-                    "cause": "点击 Thought summary 后 details 未 open 或思考正文未渲染",
-                    "repro": {
-                        "url": self.page.url,
-                        "observed": (
-                            f"open={last.get('open')} "
-                            f"body_chars={len(last.get('body_text') or '')}"
-                        ),
-                    },
-                    "screenshots": [shot] if shot else [],
+            self.fail_evidence(
+                "Thought 展开未生效",
+                classification="thinking_expand_failed",
+                cause="点击 Thought summary 后 details 未 open 或思考正文未渲染",
+                repro={
+                    "url": self.page.url,
+                    "observed": (
+                        f"open={last.get('open')} "
+                        f"body_chars={len(last.get('body_text') or '')}"
+                    ),
                 },
+                detail=(
+                    f"open={last.get('open')}，正文字符数={len(last.get('body_text') or '')}"
+                    f"（点击 summary 后 {timeout_ms}ms 内未渲染思考正文），页面原状冻结"
+                ),
+                shot_name="thinking-expand-failed",
             )
         return {
             "thinking_expanded": True,
@@ -200,80 +190,47 @@ class DesktopChatPage(BasePage):
         流式已结束且内容稳定 5 采样仍缺结构信号 = 半截渲染，立即判失败取证
         （不空等满超时）。未达成即判失败，绝不自愈重载（页面原状冻结）。
         """
-        t0 = time.time()
-        deadline = t0 + timeout_ms / 1000
-        done_stable, last_len, signals, prev = 0, -1, {}, None
-        timeline: list[dict] = []
         stall_shot = ""
-        tick = 0
-        while time.time() < deadline:
-            self.page.wait_for_timeout(1000)  # 泵事件循环（纯 sleep 会饿死 CDP 会话）
-            tick += 1
-            signals = {
+
+        def on_tick(w: SignalWatch) -> None:
+            nonlocal stall_shot
+            # 发送后长时间零回复渲染 = 卡死现场，冻结一份快照供归因
+            if (
+                not stall_shot
+                and w.signals.get("user_echo")
+                and not w.signals.get("assistant_reply")
+                and w.elapsed_s > 20
+            ):
+                stall_shot = self.snap("stall-onset")
+
+        watch = self.watch_signals(
+            signals=lambda: {
                 "user_echo": self.count("user_message") > 0,
                 "stop_cleared": self.count("stop_button") == 0,
                 "assistant_reply": self.count("assistant_reply") > 0,
                 "thinking": self.count("thinking") > 0,
                 "reply_actions": self.count("reply_actions") > 0,
-            }
-            length = self.page.evaluate(
+            },
+            size=lambda: self.page.evaluate(
                 "() => { const m = document.querySelector('div.messages');"
                 " return m ? (m.innerText || '').length : 0; }"
-            )
-            if signals != prev or tick % 10 == 0:
-                timeline.append({"t_s": tick, "text_len": length, **signals})
-                prev = dict(signals)
-            # 发送后长时间零回复渲染 = 卡死现场，冻结一份快照供归因
-            if (
-                not stall_shot
-                and signals["user_echo"]
-                and not signals["assistant_reply"]
-                and time.time() - t0 > 20
-            ):
-                stall_shot = self.snap("stall-onset")
-            content_stable = length == last_len and length > 0
-            last_len = length
-            if signals["stop_cleared"] and content_stable:
-                done_stable += 1
-            else:
-                done_stable = 0
-            if all(signals.values()) and done_stable >= 3:
-                return
-            if done_stable >= 5:  # 流式已结束、内容稳定，但结构仍缺：半截渲染，立即取证
-                self._fail_incomplete(signals, timeline, timeout_ms, stall_shot)
-        self._fail_incomplete(signals, timeline, timeout_ms, stall_shot)
-
-    def _fail_incomplete(
-        self, signals: dict, timeline: list[dict], timeout_ms: int, stall_shot: str
-    ) -> None:
-        """完整回答未达成：归因分类 + 复现信息 + 冻结取证，抛 EvidenceError。"""
-        category, cause = classify_incomplete(signals)
-        shots = [s for s in (stall_shot, self.snap("timeout")) if s]
-        repro = {
-            "url": self.page.url,
-            "observed": f"send_message 后 {timeout_ms}ms 内完整回答未达成",
-            "steps": "new_task → send_message → wait_reply_done",
-        }
-        evidence: dict = {
-            "classification": category,
-            "cause": cause,
-            "signals": signals,
-            "timeline": timeline,
-            "repro": repro,
-            "screenshots": shots,
-        }
-        try:
-            evidence.update(self.capture_context())  # 半截上下文一并取证
-        except Exception:  # noqa: BLE001 - 取证尽力而为
-            pass
-        summary = (
-            f"完整回答未达成［归因: {category}］{cause}\n"
-            f"  信号: {signals}\n"
-            f"  时间线: {len(timeline)} 个采样点（1s 粒度，0..{timeout_ms // 1000}s）\n"
-            f"  复现: {repro['steps']} @ {repro['url']}，观察: {repro['observed']}\n"
-            f"  冻结截图: {', '.join(shots) if shots else '（未捕获）'}"
+            ),
+            timeout_ms=timeout_ms,
+            # 稳定计数只认「流式已结束」：结构信号长期缺失时由 give_up 提前收场
+            stability_gate=lambda s: s.get("stop_cleared", False),
+            on_tick=on_tick,
+            give_up=lambda w: w.stable >= 5,  # 已稳定仍缺结构 = 半截渲染，立即取证
         )
-        raise EvidenceError(summary, evidence)
+        if watch.settled:
+            return
+        self.fail_incomplete(
+            "完整回答未达成",
+            classify=classify_incomplete,
+            watch=watch,
+            steps="new_task → send_message → wait_reply_done",
+            observed=f"send_message 后 {timeout_ms}ms 内完整回答未达成",
+            freeze_shots=[stall_shot],
+        )
 
     def capture_context(self) -> dict:
         """采集完整对话上下文：用户输入 + Thought 正文/工具调用 + 最终回答。

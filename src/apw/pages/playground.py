@@ -17,11 +17,10 @@
 """
 from __future__ import annotations
 
-import time
 from datetime import datetime
 from urllib.parse import urljoin
 
-from apw.pages.base import BasePage, EvidenceError
+from apw.pages.base import BasePage
 
 
 def classify_run_failure(signals: dict) -> tuple[str, str]:
@@ -67,21 +66,17 @@ class PlaygroundPage(BasePage):
         self.loc("nav_more_scenes").click()
         self.page.wait_for_timeout(600)
         self.loc("nav_playground").click()
-        deadline = time.time() + timeout_ms / 1000
-        while self.count("new_session_button") == 0 and time.time() < deadline:
-            time.sleep(0.4)
+        self.wait_until(
+            lambda: self.count("new_session_button") > 0, timeout_ms=timeout_ms, interval_ms=400
+        )
         if self.count("new_session_button") == 0:
-            shot = self.snap("playground-not-loaded")
-            raise EvidenceError(
-                "操练场未进入［归因: run_stuck］「新建会话」未渲染"
-                f"（{timeout_ms}ms）\n  复现: url={self.page.url}\n"
-                f"  冻结截图: {shot or '（未捕获）'}",
-                {
-                    "classification": "run_stuck",
-                    "cause": "操练场会话列表未渲染",
-                    "repro": {"url": self.page.url},
-                    "screenshots": [shot] if shot else [],
-                },
+            self.fail_evidence(
+                "操练场未进入",
+                classification="run_stuck",
+                cause="操练场会话列表未渲染",
+                repro={"url": self.page.url},
+                detail=f"「新建会话」未渲染（{timeout_ms}ms）",
+                shot_name="playground-not-loaded",
             )
         return {
             "surface": "playground",
@@ -106,20 +101,15 @@ class PlaygroundPage(BasePage):
             raise ValueError("未指定套组：suite 参数或 flow_state['suite_name'] 至少一个")
         full_name = f"{name}-{datetime.now().strftime('%m%d%H%M%S')}"
         self.loc("new_session_button").click()
-        deadline = time.time() + 8
-        while self.count("session_dialog") == 0 and time.time() < deadline:
-            time.sleep(0.3)
+        self.wait_until(lambda: self.count("session_dialog") > 0, timeout_ms=8_000)
         if self.count("session_dialog") == 0:
-            shot = self.snap("session-dialog-missing")
-            raise EvidenceError(
-                "新建会话弹窗未打开［归因: run_stuck］（8s）\n"
-                f"  复现: url={self.page.url}\n  冻结截图: {shot or '（未捕获）'}",
-                {
-                    "classification": "run_stuck",
-                    "cause": "「新建会话」弹窗未弹出",
-                    "repro": {"url": self.page.url},
-                    "screenshots": [shot] if shot else [],
-                },
+            self.fail_evidence(
+                "新建会话弹窗未打开",
+                classification="run_stuck",
+                cause="「新建会话」弹窗未弹出",
+                repro={"url": self.page.url},
+                detail="点击「新建会话」后 8s 弹窗未弹出",
+                shot_name="session-dialog-missing",
             )
         # 受控输入真实键入（已知产品行为）
         self.loc("session_name_input").first.click()
@@ -127,31 +117,27 @@ class PlaygroundPage(BasePage):
         select = self.loc("session_suite_select")
         options = select.locator("option").all_inner_texts()
         if suite not in options:
-            shot = self.snap("suite-not-in-select")
-            evidence = {
-                "classification": "identity_mismatch",
-                "cause": "刚创建的套组未出现在操练场「从套组加载」选择器",
-                "suite": suite,
-                "options": options,
-                "repro": {"url": self.page.url, "steps": "create_suite → new_session"},
-                "screenshots": [shot] if shot else [],
-            }
-            raise EvidenceError(
-                f"套组绑定失败［归因: identity_mismatch］选择器无 {suite!r}\n"
-                f"  复现: 新建会话绑定 @ {self.page.url}\n  冻结截图: {shot or '（未捕获）'}",
-                evidence,
+            self.fail_evidence(
+                "套组绑定失败：选择器无目标套组",
+                classification="identity_mismatch",
+                cause="刚创建的套组未出现在操练场「从套组加载」选择器",
+                repro={"url": self.page.url, "steps": "create_suite → new_session"},
+                detail=f"选择器无 {suite!r}",
+                shot_name="suite-not-in-select",
+                extra={"suite": suite, "options": options},
             )
         select.select_option(label=suite)
         self.page.wait_for_timeout(300)
         self.loc("dialog_confirm").first.click()
         # 确定后直接进 IDE（产品行为）：等身份锚徽标渲染
-        deadline = time.time() + timeout_ms / 1000
         badge = ""
-        while time.time() < deadline:
-            time.sleep(0.4)
+
+        def badge_rendered() -> bool:
+            nonlocal badge
             badge = self._loaded_badge_text()
-            if badge:
-                break
+            return bool(badge)
+
+        self.wait_until(badge_rendered, timeout_ms=timeout_ms, interval_ms=400)
         title = self._title_text()
         checks = {
             "badge_rendered": bool(badge),
@@ -167,12 +153,14 @@ class PlaygroundPage(BasePage):
         }
         if not all(checks.values()):
             category = "identity_mismatch" if checks["badge_rendered"] else "run_stuck"
-            shot = self.snap("session-bind-mismatch")
-            evidence["screenshots"] = [shot] if shot else []
-            raise EvidenceError(
-                f"会话绑定未达成［归因: {category}］{checks}\n"
-                f"  复现: 新建会话 @ {self.page.url}\n  冻结截图: {shot or '（未捕获）'}",
-                evidence,
+            self.fail_evidence(
+                "会话绑定未达成",
+                classification=category,
+                cause="身份锚（已加载徽标/会话名回显）核对未全过",
+                repro={"url": self.page.url, "observed": "新建会话绑定"},
+                detail=f"checks={checks}",
+                shot_name="session-bind-mismatch",
+                extra=evidence,
             )
         return evidence
 
@@ -192,14 +180,11 @@ class PlaygroundPage(BasePage):
         box.first.click()
         self.page.keyboard.type(message, delay=20)  # 受控输入真实键入
         self.page.keyboard.press("Enter")
-        deadline = time.time() + timeout_ms / 1000
-        stable, last_len, signals, prev, tick = 0, -1, {}, None, 0
-        timeline: list[dict] = []
-        while time.time() < deadline:
-            time.sleep(1)
-            tick += 1
-            log = self._log_text()
-            signals = {
+        log_box: dict[str, str] = {"text": ""}
+
+        def read_signals() -> dict[str, bool]:
+            log_box["text"] = log = self._log_text()
+            return {
                 "done_line": self.count("run_done_marker") > 0,
                 "status_completed": self.count("run_status_done") > 0,
                 "token_stat": self.count("run_token_stat") > 0,
@@ -207,48 +192,42 @@ class PlaygroundPage(BasePage):
                 "reply_output": "\n" in log and "│" in log,
                 "running_cleared": self.count("run_running_marker") == 0,
             }
-            length = len(log)
-            if signals != prev or tick % 10 == 0:
-                timeline.append({"t_s": tick, "log_len": length, **signals})
-                prev = dict(signals)
-            gate = {k: v for k, v in signals.items() if k != "running_cleared"}
-            if all(gate.values()) and length == last_len and length > 0:
-                stable += 1
-                if stable >= 3:  # ⑥ 日志稳定
-                    return self._run_evidence(message, signals, timeline)
-            else:
-                stable = 0
-            last_len = length
-        category, cause = classify_run_failure(signals)
-        shot = self.snap("debug-run-timeout")
-        evidence = self._run_evidence(message, signals, timeline)
-        evidence.update(
-            {
-                "classification": category,
-                "cause": cause,
-                "repro": {
-                    "url": self.page.url,
-                    "observed": f"运行启动后 {timeout_ms}ms 内完成信号未达成",
-                    "steps": "new_session → send_debug_message",
-                },
-                "screenshots": [shot] if shot else [],
-            }
+
+        watch = self.watch_signals(
+            signals=read_signals,
+            size=lambda: len(log_box["text"]),
+            timeout_ms=timeout_ms,
+            size_field="log_len",
+            # running_cleared 是流式态观测：完成必需信号不含它（缺失结构由分类取证兜住）
+            gate={"done_line", "status_completed", "token_stat", "prompt_echo", "reply_output"},
         )
-        raise EvidenceError(
-            f"调试运行未达成［归因: {category}］{cause}\n  信号: {signals}\n"
-            f"  冻结截图: {shot or '（未捕获）'}",
-            evidence,
+        if watch.settled:  # ⑥ 日志稳定（watch 内已多信号收敛）
+            return self._run_evidence(message, watch.signals, watch.timeline)
+        self.fail_incomplete(
+            "调试运行未达成",
+            classify=classify_run_failure,
+            watch=watch,
+            steps="new_session → send_debug_message",
+            observed=f"运行启动后 {timeout_ms}ms 内完成信号未达成",
+            shot_name="debug-run-timeout",
+            extra=self._run_facts(message),
         )
 
-    def _run_evidence(self, message: str, signals: dict, timeline: list[dict]) -> dict:
+    def _run_facts(self, message: str) -> dict:
+        """调试运行现场事实（日志尾/行数/身份锚/URL）：成功证据与失败取证共用。"""
         log = self._log_text()
         return {
             "message": message,
-            "run_signals": signals,
-            "timeline": timeline[-5:],
             "log_tail": log[-600:],
             "log_lines": len(log.splitlines()),
             "session_name": self._title_text(),
             "loaded_badge": self._loaded_badge_text(),
             "url": self.page.url.split("?")[0],
+        }
+
+    def _run_evidence(self, message: str, signals: dict, timeline: list[dict]) -> dict:
+        return {
+            "run_signals": signals,
+            "timeline": timeline[-5:],
+            **self._run_facts(message),
         }

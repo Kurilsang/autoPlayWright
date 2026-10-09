@@ -9,12 +9,11 @@
 """
 from __future__ import annotations
 
-import time
 from datetime import datetime
 from typing import TYPE_CHECKING
 from urllib.parse import urljoin
 
-from apw.pages.base import BasePage, EvidenceError
+from apw.pages.base import BasePage
 
 if TYPE_CHECKING:
     from playwright.sync_api import Page
@@ -130,20 +129,15 @@ class AmlWorkflowPage(BasePage):
         self.loc(_VISIBILITY_LOCATORS[visibility]).click()
         self.loc("wf_create_button").click()
         self.loc("wf_title_input").wait_for(state="visible", timeout=15_000)
-        deadline = time.time() + 10
-        while self._title_value() != full and time.time() < deadline:
-            time.sleep(0.3)
+        self.wait_until(lambda: self._title_value() == full, timeout_ms=10_000)
         if self._title_value() != full:
-            shot = self.snap("create-no-editor")
-            raise EvidenceError(
-                f"创建后编辑器未就绪［归因: not_ready］标题输入未回显 {full!r}\n"
-                f"  冻结截图: {shot or '（未捕获）'}",
-                {
-                    "classification": "not_ready",
-                    "cause": "创建后未进入编辑器（标题输入未回显）",
-                    "repro": {"url": self.page.url, "steps": "new_workflow → 创建"},
-                    "screenshots": [shot] if shot else [],
-                },
+            self.fail_evidence(
+                "创建后编辑器未就绪",
+                classification="not_ready",
+                cause="创建后未进入编辑器（标题输入未回显）",
+                repro={"url": self.page.url, "steps": "new_workflow → 创建"},
+                detail=f"标题输入未回显 {full!r}",
+                shot_name="create-no-editor",
             )
         return full
 
@@ -166,54 +160,25 @@ class AmlWorkflowPage(BasePage):
 
         未达成即判失败，绝不自愈重载（静默失败/卡死本身就是缺陷，页面原状冻结）。
         """
-        deadline = time.time() + timeout_ms / 1000
-        stable, last_len, signals, prev, tick = 0, -1, {}, None, 0
-        timeline: list[dict] = []
-        while time.time() < deadline:
-            time.sleep(1)
-            tick += 1
-            signals = {
+        watch = self.watch_signals(
+            signals=lambda: {
                 "gen_cleared": self.count("gen_running_marker") == 0,
                 "gen_done": self.count("gen_done_marker") > 0,
                 "script_applied": self.count("script_empty_marker") == 0,
-            }
-            length = self.page.evaluate(
-                "() => (document.body.innerText || '').length"
-            )
-            if signals != prev or tick % 10 == 0:
-                timeline.append({"t_s": tick, "text_len": length, **signals})
-                prev = dict(signals)
-            if all(signals.values()) and length == last_len and length > 0:
-                stable += 1
-                if stable >= 3:
-                    return {"gen_signals": signals, "timeline": timeline[-5:]}
-            else:
-                stable = 0
-            last_len = length
-        category, cause = classify_gen_failure(signals)
-        shot = self.snap("gen-timeout")
-        evidence: dict = {
-            "classification": category,
-            "cause": cause,
-            "signals": signals,
-            "timeline": timeline,
-            "repro": {
-                "url": self.page.url,
-                "observed": f"生成提交后 {timeout_ms}ms 内未达成完成信号",
-                "steps": "fill_prompt → 生成工作流 → wait_gen_done",
             },
-            "screenshots": [shot] if shot else [],
-        }
-        if context:
-            evidence.update(context)
-        try:
-            evidence.update(self.capture_context())  # 半截现场一并取证
-        except Exception:  # noqa: BLE001 - 取证尽力而为
-            pass
-        raise EvidenceError(
-            f"AI 生成未达成［归因: {category}］{cause}\n"
-            f"  信号: {signals}\n  冻结截图: {shot or '（未捕获）'}",
-            evidence,
+            size=lambda: self.page.evaluate("() => (document.body.innerText || '').length"),
+            timeout_ms=timeout_ms,
+        )
+        if watch.settled:
+            return {"gen_signals": watch.signals, "timeline": watch.timeline[-5:]}
+        self.fail_incomplete(
+            "AI 生成未达成",
+            classify=classify_gen_failure,
+            watch=watch,
+            steps="fill_prompt → 生成工作流 → wait_gen_done",
+            observed=f"生成提交后 {timeout_ms}ms 内未达成完成信号",
+            shot_name="gen-timeout",
+            extra=context,
         )
 
     def generate_ai(self, prompt: str, timeout_ms: int = 180_000) -> dict:
@@ -248,17 +213,15 @@ class AmlWorkflowPage(BasePage):
         try:
             self.loc("saved_badge").wait_for(state="visible", timeout=10_000)
         except Exception as exc:  # noqa: BLE001 - 保存失败即取证
-            shot = self.snap("save-failed")
-            raise EvidenceError(
-                f"脚本保存未生效［归因: save_failed］顶栏未回「已保存」\n"
-                f"  冻结截图: {shot or '（未捕获）'}",
-                {
-                    "classification": "save_failed",
-                    "cause": "点击「保存工作流」后未出现「已保存」",
-                    "repro": {"url": self.page.url, "steps": "type_script → 保存工作流"},
-                    "screenshots": [shot] if shot else [],
-                },
-            ) from exc
+            self.fail_evidence(
+                "脚本保存未生效",
+                classification="save_failed",
+                cause="点击「保存工作流」后未出现「已保存」",
+                repro={"url": self.page.url, "steps": "type_script → 保存工作流"},
+                detail="顶栏未回「已保存」",
+                shot_name="save-failed",
+                from_exc=exc,
+            )
         return {"script": script, "saved": True}
 
     # ---- 运行 ----
@@ -268,18 +231,15 @@ class AmlWorkflowPage(BasePage):
         try:
             self.loc("run_button").click(timeout=5_000)
         except Exception as exc:  # noqa: BLE001
-            shot = self.snap("run-not-started")
-            raise EvidenceError(
-                "运行未启动［归因: not_ready］「运行」不可用"
-                "（常见：脚本未保存 / 生成中 / 无脚本）\n"
-                f"  冻结截图: {shot or '（未捕获）'}",
-                {
-                    "classification": "not_ready",
-                    "cause": "「运行」按钮不可用",
-                    "repro": {"url": self.page.url, "steps": "start_run"},
-                    "screenshots": [shot] if shot else [],
-                },
-            ) from exc
+            self.fail_evidence(
+                "运行未启动",
+                classification="not_ready",
+                cause="「运行」按钮不可用",
+                repro={"url": self.page.url, "steps": "start_run"},
+                detail="常见：脚本未保存 / 生成中 / 无脚本",
+                shot_name="run-not-started",
+                from_exc=exc,
+            )
         return {"run_started": True}
 
     def wait_run_done(self, timeout_ms: int = 180_000) -> dict:
@@ -287,57 +247,32 @@ class AmlWorkflowPage(BasePage):
 
         未达成即判失败冻结现场（运行卡死/半截结束本身就是缺陷）。
         """
-        deadline = time.time() + timeout_ms / 1000
-        stable, last_len, signals, prev, tick = 0, -1, {}, None, 0
-        timeline: list[dict] = []
-        while time.time() < deadline:
-            time.sleep(1)
-            tick += 1
-            signals = {
+        watch = self.watch_signals(
+            signals=lambda: {
                 "run_done": self.count("run_done_marker") > 0,
                 "cancel_cleared": self.count("cancel_run_button") == 0,
-            }
-            length = self.page.evaluate(
+            },
+            size=lambda: self.page.evaluate(
                 "() => [...document.querySelectorAll('div.break-all.leading-relaxed')]"
                 ".map(el => (el.textContent || '').length).reduce((a, b) => a + b, 0)"
-            )
-            if signals != prev or tick % 10 == 0:
-                timeline.append({"t_s": tick, "log_len": length, **signals})
-                prev = dict(signals)
-            if all(signals.values()) and length == last_len and length > 0:
-                stable += 1
-                if stable >= 3:
-                    evidence = {"run_signals": signals, "timeline": timeline[-5:]}
-                    try:
-                        evidence.update(self.capture_context())
-                    except Exception:  # noqa: BLE001
-                        pass
-                    return evidence
-            else:
-                stable = 0
-            last_len = length
-        category, cause = classify_run_failure(signals)
-        shot = self.snap("run-timeout")
-        evidence: dict = {
-            "classification": category,
-            "cause": cause,
-            "signals": signals,
-            "timeline": timeline,
-            "repro": {
-                "url": self.page.url,
-                "observed": f"运行启动后 {timeout_ms}ms 内完成信号未达成",
-                "steps": "start_run → wait_run_done",
-            },
-            "screenshots": [shot] if shot else [],
-        }
-        try:
-            evidence.update(self.capture_context())
-        except Exception:  # noqa: BLE001
-            pass
-        raise EvidenceError(
-            f"运行未完成［归因: {category}］{cause}\n"
-            f"  信号: {signals}\n  冻结截图: {shot or '（未捕获）'}",
-            evidence,
+            ),
+            timeout_ms=timeout_ms,
+            size_field="log_len",
+        )
+        if watch.settled:
+            evidence = {"run_signals": watch.signals, "timeline": watch.timeline[-5:]}
+            try:
+                evidence.update(self.capture_context())
+            except Exception:  # noqa: BLE001
+                pass
+            return evidence
+        self.fail_incomplete(
+            "运行未完成",
+            classify=classify_run_failure,
+            watch=watch,
+            steps="start_run → wait_run_done",
+            observed=f"运行启动后 {timeout_ms}ms 内完成信号未达成",
+            shot_name="run-timeout",
         )
 
     # ---- 并发：多标签同时发布 AI 任务 ----
@@ -373,16 +308,13 @@ class AmlWorkflowPage(BasePage):
             actual = actor._title_value()
             if actual == full:
                 continue
-            shot = actor.snap("identity-mismatch")
-            raise EvidenceError(
-                f"并发串台［归因: identity_mismatch］标签身份错位：期望 {full!r}，实际 {actual!r}\n"
-                f"  冻结截图: {shot or '（未捕获）'}",
-                {
-                    "classification": "identity_mismatch",
-                    "cause": "并发任务标签页身份错位（UI 串台）",
-                    "repro": {"expected": full, "actual": actual, "url": actor.page.url},
-                    "screenshots": [shot] if shot else [],
-                },
+            actor.fail_evidence(
+                "并发串台：标签身份错位",
+                classification="identity_mismatch",
+                cause="并发任务标签页身份错位（UI 串台）",
+                repro={"expected": full, "actual": actual, "url": actor.page.url},
+                detail=f"期望 {full!r}，实际 {actual!r}",
+                shot_name="identity-mismatch",
             )
 
     @staticmethod
@@ -400,9 +332,8 @@ class AmlWorkflowPage(BasePage):
         evidence.update(extra)
         return evidence
 
-    @staticmethod
     def _observe_concurrent(
-        actors: list[AmlWorkflowPage], marker: str, samples: int = 20, interval: float = 0.5
+        self, actors: list[AmlWorkflowPage], marker: str, samples: int = 20, interval: float = 0.5
     ) -> tuple[bool, list[bool]]:
         """轮询捕捉「全部标签同处 marker 态」的瞬时并发证据。
 
@@ -415,7 +346,7 @@ class AmlWorkflowPage(BasePage):
             ever = [e or f for e, f in zip(ever, flags, strict=True)]
             if all(flags):
                 return True, ever
-            time.sleep(interval)
+            self.settle(int(interval * 1000))
         return False, ever
 
     def publish_ai_tasks_concurrently(

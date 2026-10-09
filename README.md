@@ -4,6 +4,7 @@ Agent 产品的 UI 自动化测试框架：业务链路用 YAML DSL 描述，pyt
 Web 端与 Electron 客户端共用一套用例，报告输出结构化 JSON + HTML（Allure 可选）。
 
 - 规格：`docs/SPEC.md`（决策记录见附录）
+- 用例进度：`docs/CASE_PROGRESS.md`；目录结构：`docs/STRUCTURE.md`
 - 任务票：`.scratch/autoPlayWright/issues/`
 
 ## 快速开始
@@ -20,6 +21,19 @@ python -m venv .venv
 # 全部
 .venv\Scripts\pytest tests flows
 ```
+
+## 环境配置（跑非 fixture 环境前）
+
+- **fixture（默认）**：零配置，`pytest flows` 走本地夹具站点。
+- **test（真实测试环境）**：复制 `configs/envs/test.example.yaml` → `configs/envs/test.yaml`
+  填内网地址（gitignored，真实值不入库）；登录凭据放 `configs/secrets.local.yaml`
+  （`username`/`password`，gitignored）或 CI 环境变量 `APW_USERNAME`/`APW_PASSWORD`。
+  登录成功后 `configs/auth-state.json` 回写会话，后续运行免登录。
+- **desktop（Electron 客户端）**：复制 `configs/desktop.local.example.bat` → `configs/desktop.local.bat`
+  填客户端路径（或先 `set APW_DESKTOP_EXE=...`）；客户端需带 `--remote-debugging-port=9333` 启动，
+  `run_full_debug.bat` 会自动拉起并等 CDP 就绪。
+- **脱敏映射**：复制 `configs/sanitize.example.yaml` → `configs/sanitize.local.yaml`
+  （快照/探查产物落盘前自动脱敏，映射真实串仅存本地）。
 
 ## 写一条用例 = 写一个 YAML
 
@@ -42,8 +56,9 @@ steps:
   - judge: { note: "v1 预留：LLM-as-Judge 后续接入" }
 ```
 
-真实环境链路可参考 `flows/aml_chat_smoke.yaml`（`--apw-env test` 执行；已入库 13 条链路见 `flows/*.yaml`，含桌面端 `flows/desktop_chat_smoke.yaml`）。
-新页面的完整新增流程（探查快照 → 定位器 → 页面对象 → flow → 验收门）见 `AGENTS.md`「怎么加用例」。
+真实环境链路可参考 `flows/aml_chat_smoke.yaml`（`--apw-env test` 执行；已入库 13 条链路见 `flows/*.yaml`，含桌面端 `flows/desktop_chat_smoke.yaml`；清单与进度见 `docs/CASE_PROGRESS.md`）。
+新页面「五步走」的完整指引（探查快照 → 定位器 → 页面对象 → flow → 验收门）见 `AGENTS.md`「怎么加用例」；
+目录与各层职责见 `docs/STRUCTURE.md`。
 
 配套要素：
 
@@ -71,6 +86,7 @@ pytest flows/desktop_chat_smoke.yaml --apw-env desktop
 # 调试模式：窗口可见 + 放慢动作，实时观察执行过程
 pytest flows --apw-env test --apw-headed --apw-slowmo 250
 # 或直接双击 / 运行 run_debug.bat（等价于上面这条，可追加 pytest 参数）
+# run_full_debug.bat = 全量调试跑全部用例（桌面端自动带调试端口拉起客户端）
 
 # 页面状态快照（AI 生成的事实依据 / 页面改版 diff 基线）
 python -m apw.crawler --env test --config configs/crawl/aml_chat.yaml

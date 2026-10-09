@@ -41,7 +41,7 @@ Python 3.11+ / Playwright（同步 API）/ pytest 9（pytest11 插件入口）/ 
 - `configs/envs/*.yaml` — 环境配置（`--apw-env` 选择；fixture=本地夹具站点）
 - `configs/crawl/*.yaml` — 爬取配置（状态路径 + 完成信号探针，喂生成器）
 - `scripts/` — 生成侧工具脚本（快照摘要等，AI 复用）
-- `reports/` — 运行产物（gitignored；`report.html` 会话结束自动渲染）；`docs/SPEC.md` — 规格与决策记录；`docs/banner-light.html` — 项目报告页（banner 轮播，`run_slides.bat` 打开）
+- `reports/` — 运行产物（gitignored；`report.html` 会话结束自动渲染）；`docs/SPEC.md` — 规格与决策记录；`docs/CASE_PROGRESS.md` — 用例清单与进度（新增/改动链路后同步）；`docs/STRUCTURE.md` — 目录结构；`docs/banner-light.html` — 项目报告页（banner 轮播，`run_slides.bat` 打开）
 - `.scratch/autoPlayWright/issues/` — 主建任务票（01~08，依赖序）；`.scratch/review-p0/` — 评审修复批（spec + 票 + P1/P2 backlog）；完成即勾验收框并标 done
 - commit 格式：`feat/fix: 一句话` + `- 要点`，极简
 
@@ -54,7 +54,7 @@ Python 3.11+ / Playwright（同步 API）/ pytest 9（pytest11 插件入口）/ 
 - 页面元素一律走定位器仓库，禁止散落裸 selector
 - **凭据与内部信息永不入库**：账号密码走 `configs/secrets.local.yaml`（gitignored）或 CI 环境变量 `APW_USERNAME`/`APW_PASSWORD`；内网 URL/域名/IP/API/产品名/个人信息在提交内容与快照产物中一律以占位符呈现（环境真实值只在本地 `configs/envs/test.yaml`）；快照/探查产物落盘自动脱敏（`apw.sanitize`，映射 `configs/sanitize.local.yaml` 真实串仅存本地 + 通用模式兜底）；入库红线有机器门禁 `tests/test_no_secrets.py`（内网 IP/凭据值/产品名扫描）
 
-## 当前状态（2026-09-30）
+## 当前状态（2026-10-09）
 
 - 票 01/02 已交付；T07 预演产物已产品化：`locators/aml_chat.yaml` + `AmlChatPage` + `flows/aml_chat_smoke.yaml`（真实环境冒烟持续绿灯）
 - 票 06 爬虫快照器已交付：`python -m apw.crawler` 状态化爬取（D20 快照骨架），产物入 `.scratch/autoPlayWright/snapshots/`；另有 `page: probe` 探查原语（生成侧保留名，goto/click/type/insert/dump_dom，未知页面首轮探查用，流程用例禁用）与 `scripts/snapshot_summary.py` 快照摘要工具；**pending**：票面「快照语义人工检查」未勾

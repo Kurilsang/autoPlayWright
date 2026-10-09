@@ -427,12 +427,12 @@
             <div class="r chap">02</div>
             <h1 class="r">它解决什么？</h1>
           </div>
-          <div class="r sub">一句话：把「逐条写代码」压缩成「写/审一个 YAML」，并且让结果可信、可追溯。</div>
+          <div class="r sub">一句话：把「逐条写代码」压缩成「编排一个 YAML」，判定语义沉淀为页面原语，结果可信、可追溯。</div>
           <div class="body">
             <div class="grid2" style="gap:32px">
               <div style="flex:1.25">
                 <ul class="bul">
-                  <li class="r"><span class="m">▸</span><div><div class="tx">新增用例 ≈ 写/审一个 YAML</div><div class="sb">DSL 描述链路，不写 Python</div></div></li>
+                  <li class="r"><span class="m">▸</span><div><div class="tx">链路编排 ≈ 写/审一个 YAML</div><div class="sb">判定语义沉淀为页面原语（Python）</div></div></li>
                   <li class="r"><span class="m">▸</span><div><div class="tx">一次编写，双端执行</div><div class="sb">Web / Electron 共享 Page Object</div></div></li>
                   <li class="r"><span class="m">▸</span><div><div class="tx">改版不怕：定位器仓库</div><div class="sb">多候选回退，改版只修定位器</div></div></li>
                   <li class="r"><span class="m">▸</span><div><div class="tx">断言不抖：只测确定性内容</div><div class="sb">组件 / 状态 / 结构，不碰 LLM 措辞</div></div></li>
@@ -446,7 +446,7 @@
                     <span class="dot" style="background:#FF6B7A"></span>
                     <span class="dot" style="background:#FFB454"></span>
                     <span class="dot" style="background:#37D6A6"></span>
-                    <span style="margin-left:8px">flows/example_chat.yaml</span>
+                    <span style="margin-left:8px">examples/example_chat.yaml</span>
                   </div>
 <pre><span class="d">meta: { id: example-chat, platforms: [web], tags: [P0] }</span>
 <span class="k">steps:</span>
@@ -461,7 +461,7 @@
                 </div>
                 <div class="r card good" style="margin-top:14px">
                   <div class="t"><span class="badge good">闭环</span>生产闭环</div>
-                  <div class="b">写 YAML → 校验 → 执行 → 报告 → 取证回流。</div>
+                  <div class="b">编排 YAML → 校验 → 执行 → 报告 → 取证回流。</div>
                 </div>
                 <div class="r" style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap">
                   <span class="chip accent">JSON 第一公民</span>
@@ -698,7 +698,7 @@
               <div class="r panel" style="border-top-color:var(--accent2)">
                 <div class="t">业务用例 <span class="pt" style="color:var(--accent2)">flows/</span></div>
                 <ul>
-                  <li>13 条链路入库：对话 / 工作流 / 广场 / 操练场 / 桌面端</li>
+                  <li>12 条业务链路入库：对话 / 工作流 / 广场 / 操练场 / 桌面端</li>
                   <li>工作流 4 条 + 并发 2 路（逐标签身份核对）</li>
                   <li>真实环境 3 次绿跑，冒烟持续绿灯</li>
                 </ul>
@@ -718,12 +718,12 @@
                 <ul>
                   <li>状态化爬虫 + 快照骨架 + 落盘自动脱敏</li>
                   <li>tests 全绿 + 红线门禁 test_no_secrets</li>
-                  <li>docs/SPEC.md（25 条决策）+ AGENTS.md</li>
+                  <li>docs/SPEC.md（27 条决策）+ AGENTS.md</li>
                 </ul>
               </div>
             </div>
             <div class="r note" style="margin-top:18px">
-              最小可交付形态：新增一条核心链路 <span class="hl">≈ 写/审一个 YAML</span>，即生产闭环。
+              最小可交付形态：判定原语沉淀后，新增一条核心链路 <span class="hl">≈ 编排一个 YAML</span>，即生产闭环。
             </div>
           </div>
         </div>
@@ -770,7 +770,7 @@
         <div class="inner">
           <div class="r big small">autoPlayWright</div>
           <div class="r mid" style="margin-top:20px; font-size:30px; font-weight:700; color:var(--text); letter-spacing:0">
-            核心生产闭环：新增用例 ≈ 写/审一个 YAML
+            核心生产闭环：链路编排 ≈ 一个 YAML，判定语义沉淀为页面原语
           </div>
           <div class="r chips">
             <span class="chip good">只断言确定性内容</span>

@@ -7,6 +7,7 @@
 ```text
 autoPlayWright/
 ├─ flows/                  业务链路用例（YAML DSL，一链路一文件）
+├─ examples/               DSL 示例（fixture 夹具站点演示，不计业务链路）
 ├─ locators/               命名定位器仓库（一页一文件，禁止散落裸 selector）
 ├─ src/apw/                框架源码（分层见下）
 ├─ tests/                  框架自测（含浏览器端到端，走 tests/fixture_site/ 本地夹具站点）
@@ -15,12 +16,10 @@ autoPlayWright/
 ├─ docs/                   规格、用例进度、目录结构、项目报告页
 ├─ reports/                运行产物（gitignored；report.html 会话结束自动渲染）
 ├─ workspace/              生成侧临时探查脚本（gitignored，不入库）
-├─ video/                  Remotion 项目汇报动画（独立 npm 工程，见 video/README.md）
 ├─ .scratch/               任务票、评审批次、页面快照产物（快照不入库）
 ├─ run_debug.bat           一键调试：单条/筛选链路，窗口可见 + 250ms 慢动作
 ├─ run_full_debug.bat      全量调试：跑全部用例；桌面端自动带 --remote-debugging-port=9333 拉起客户端
 ├─ run_slides.bat          打开 docs/banner-light.html 项目报告页
-├─ run_video.bat           Remotion 出片/预览
 ├─ pyproject.toml          包定义 + pytest11 插件入口
 ├─ README.md               使用入口（安装、配置、常用命令）
 └─ AGENTS.md               Agent 规则：硬约束、新页面五步走、已知产品行为/缺陷
@@ -79,6 +78,7 @@ autoPlayWright/
 | `.scratch/review-p0/` | 评审修复批（spec + 票 + P1/P2 backlog） |
 | `.scratch/autoPlayWright/snapshots/` | 页面快照产物（JSON/HTML/PNG/TXT 均不入库） |
 | `workspace/` | 一次性探查脚本（不入库） |
+| `video/`、`run_video.bat` | 本地演示资产（Remotion 汇报动画出片），gitignored 不入库 |
 | `docs/banner-light.html` | 项目报告页（banner 轮播） |
 
 ## 文档地图
@@ -90,4 +90,3 @@ autoPlayWright/
 | `docs/SPEC.md` | 规格与决策记录（含 grilling 结论附录） |
 | `docs/CASE_PROGRESS.md` | 用例清单与进度 |
 | `docs/STRUCTURE.md` | 本文 |
-| `video/README.md` | 汇报动画怎么出片 |

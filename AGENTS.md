@@ -1,6 +1,6 @@
 # AGENTS.md
 
-内部 Agent 产品（Web + Electron 客户端）的 UI 自动化测试框架：业务链路用 YAML DSL 描述，pytest 插件自动收集执行，输出结构化 JSON + Allure 报告。
+内部 Agent 产品（Web + Electron 客户端）的 UI 自动化测试框架：业务链路用 YAML DSL 编排（判定语义沉淀为页面对象原语），pytest 插件自动收集执行，输出结构化 JSON + Allure 报告。
 
 ## 怎么跑
 
@@ -36,12 +36,13 @@ Python 3.11+ / Playwright（同步 API）/ pytest 9（pytest11 插件入口）/ 
 ## 目录与约定
 
 - `flows/*.yaml` — 业务链路用例（meta：platforms/envs/tags，steps：do·assert·judge，judge 为 v1 预留标记 planned）
+- `examples/` — DSL 示例（fixture 夹具站点演示 + 引擎端到端素材，不计业务链路；`pytest --apw-flows-dir examples examples` 可跑）
 - `locators/*.yaml` — 命名定位器仓库，候选优先级 testid > role+name > placeholder/label > text > css/xpath
 - `src/apw/` — 分层：dsl（schema 校验）→ engine（FlowRunner 产 StepEvent）→ pages → locators → driver（Web/Electron 统一输出 Page）→ reporter（JSON 第一公民）→ pytest_plugin；`apw.crawler` 生成侧快照爬虫（含 `page: probe` 探查原语）
 - `configs/envs/*.yaml` — 环境配置（`--apw-env` 选择；fixture=本地夹具站点）
 - `configs/crawl/*.yaml` — 爬取配置（状态路径 + 完成信号探针，喂生成器）
 - `scripts/` — 生成侧工具脚本（快照摘要等，AI 复用）
-- `reports/` — 运行产物（gitignored；`report.html` 会话结束自动渲染）；`docs/SPEC.md` — 规格与决策记录；`docs/CASE_PROGRESS.md` — 用例清单与进度（新增/改动链路后同步）；`docs/STRUCTURE.md` — 目录结构；`docs/banner-light.html` — 项目报告页（banner 轮播，`run_slides.bat` 打开）
+- `reports/` — 运行产物（gitignored；`report.html` 会话结束自动渲染）；`docs/SPEC.md` — 规格与决策记录；`docs/CASE_PROGRESS.md` — 用例清单与进度（新增/改动链路后同步）；`docs/STRUCTURE.md` — 目录结构；`docs/banner-light.html` — 项目报告页（banner 轮播，`run_slides.bat` 打开）；`video/`+`run_video.bat` — Remotion 汇报动画本地资产（gitignored 不入库）
 - `.scratch/autoPlayWright/issues/` — 主建任务票（01~08，依赖序）；`.scratch/review-p0/` — 评审修复批（spec + 票 + P1/P2 backlog）；完成即勾验收框并标 done
 - commit 格式：`feat/fix: 一句话` + `- 要点`，极简
 
@@ -52,6 +53,7 @@ Python 3.11+ / Playwright（同步 API）/ pytest 9（pytest11 插件入口）/ 
 - **失败即取证，禁止自愈**：卡死/半截渲染判 fail 并冻结现场（归因/复现/信号时间线/冻结截图随 EvidenceError 入报告），不做自动重载/重试把偶发缺陷跑绿
 - 引擎不 import pytest/allure；报告与 pytest 只是引擎下游消费者
 - 页面元素一律走定位器仓库，禁止散落裸 selector
+- 页面对象的等待/判定/取证一律走 BasePage 基建（`settle`/`wait_until`/`SignalWatch` + `fail_evidence`/`fail_incomplete`，D27），不裸写 time.sleep/裸循环/裸拼 EvidenceError
 - **凭据与内部信息永不入库**：账号密码走 `configs/secrets.local.yaml`（gitignored）或 CI 环境变量 `APW_USERNAME`/`APW_PASSWORD`；内网 URL/域名/IP/API/产品名/个人信息在提交内容与快照产物中一律以占位符呈现（环境真实值只在本地 `configs/envs/test.yaml`）；快照/探查产物落盘自动脱敏（`apw.sanitize`，映射 `configs/sanitize.local.yaml` 真实串仅存本地 + 通用模式兜底）；入库红线有机器门禁 `tests/test_no_secrets.py`（内网 IP/凭据值/产品名扫描）
 
 ## 当前状态（2026-10-09）
@@ -80,6 +82,7 @@ Python 3.11+ / Playwright（同步 API）/ pytest 9（pytest11 插件入口）/ 
 - 已知产品行为：操练场（更多场景→「创作与调试」组）= 套组调试沙箱，会话卡绑一个套组；「新建会话」弹窗（会话名称 + 原生 select 从套组加载）确定后**直接进 IDE**（列表恢复才走「进入调试」）；IDE 两种模式=Agent 助手（读写工作区文件）/▶测试套组（输入用户消息 Enter 运行一次完整推理）；运行日志=「▶ 操练场运行开始」→「Prompt: 回显」→「│」输出行→「✅ 运行完成，用时 Ns，Token: N」，顶栏状态 空闲→已完成
 - 已知产品行为（桌面客户端）：组合器为 contenteditable 富输入（Enter 发送/Shift+Enter 换行，同工作流编辑器陷阱一律真实键入）；生成中发送键变「停止生成」（`button.btn-send.btn-stop`）= 流式信号；Thought 折叠块（`details.msg-thinking`）**正文展开才渲染**（折叠态仅 summary，`expand_thinking` 测展开：summary 点击 → `details[open]` + `.msg-thinking-body`）；完成态=回答气泡 + 完成态操作行；「新任务」清空会话区（未清空判 fail）；无会话 URL，身份锚点=消息 `data-message-id`；会话标题异步生效（生成中带 `.is-generating`）
 - 已知产品缺陷观察（桌面客户端）：纯寒暄偶发走 ~2s 无思考快速路径，回复整条缺 Thought 块（2026-10-08 实测 8 轮中 2 轮，判 fail 取证见 reports/20261008-110107、reports/20261008-112123）；对话用例一律用**推理型消息**保证思考块渲染，该不一致待产品侧确认
+- 仓库与基建口径（2026-10-09）：DSL=编排层、判定语义在页面原语（宣传口径同步修正，D26）；等待/判定/取证收编 BasePage 基建（D27，SignalWatch 多信号收敛 + fail_evidence/fail_incomplete 统一取证，自测 `tests/test_signal_watch.py`）；示例链路移居 `examples/`（业务链路口径 = 12 条）；`video/`+`run_video.bat` 演示资产出库为本地（gitignored）
 - 测试基线：`pytest tests` 全绿（框架自测，含证据链路/失败取证/三态报告/脱敏用例/红线门禁）；工作流 4 条链路 + 对话并行切换 + Skills 广场 + 套组广场 + 报告样式库 2 条 + 操练场真实环境 3 次绿跑 + 桌面端对话冒烟真实客户端 3 次绿跑
 - 评审修复批次 P0 已交付（`.scratch/review-p0/`，6 票全 done）：prepare 失败与空步骤终态留痕、报告三态 + 跳过原因、run 目录唯一化 + 汇总合并、快照脱敏管道、定位器计数与解析同链
 - 留空待输入：仅 Electron 安装包 launch（T03；CDP attach 已有真实用例跑通=桌面端对话冒烟）

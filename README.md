@@ -1,6 +1,7 @@
 # autoPlayWright（apw）
 
-Agent 产品的 UI 自动化测试框架：业务链路用 YAML DSL 描述，pytest 解释执行，
+Agent 产品的 UI 自动化测试框架：业务链路用 YAML DSL 编排（步骤/参数/断言），
+判定语义沉淀为页面对象原语（Python），pytest 解释执行，
 Web 端与 Electron 客户端共用一套用例，报告输出结构化 JSON + HTML（Allure 可选）。
 
 - 规格：`docs/SPEC.md`（决策记录见附录）
@@ -16,7 +17,9 @@ python -m venv .venv
 
 # 框架自测（含浏览器端到端，走本地夹具站点）
 .venv\Scripts\pytest tests
-# 业务链路（默认 fixture 本地夹具环境）
+# DSL 示例（fixture 本地夹具站点；框架自测亦端到端覆盖）
+.venv\Scripts\pytest --apw-flows-dir examples examples
+# 业务链路（按 meta.envs/platforms 自动跳过不匹配项；真实环境见「常用命令」）
 .venv\Scripts\pytest flows
 # 全部
 .venv\Scripts\pytest tests flows
@@ -35,9 +38,9 @@ python -m venv .venv
 - **脱敏映射**：复制 `configs/sanitize.example.yaml` → `configs/sanitize.local.yaml`
   （快照/探查产物落盘前自动脱敏，映射真实串仅存本地）。
 
-## 写一条用例 = 写一个 YAML
+## 一条链路 = 一个 YAML（编排）
 
-`flows/example_chat.yaml`：
+`examples/example_chat.yaml`（DSL 示例，fixture 本地夹具站点；业务链路在 `flows/`）：
 
 ```yaml
 meta:
@@ -56,7 +59,7 @@ steps:
   - judge: { note: "v1 预留：LLM-as-Judge 后续接入" }
 ```
 
-真实环境链路可参考 `flows/aml_chat_smoke.yaml`（`--apw-env test` 执行；已入库 13 条链路见 `flows/*.yaml`，含桌面端 `flows/desktop_chat_smoke.yaml`；清单与进度见 `docs/CASE_PROGRESS.md`）。
+真实环境链路可参考 `flows/aml_chat_smoke.yaml`（`--apw-env test` 执行；已入库 12 条业务链路见 `flows/*.yaml`，含桌面端 `flows/desktop_chat_smoke.yaml`；另有 DSL 示例 `examples/example_chat.yaml` 不计业务链路；清单与进度见 `docs/CASE_PROGRESS.md`）。
 新页面「五步走」的完整指引（探查快照 → 定位器 → 页面对象 → flow → 验收门）见 `AGENTS.md`「怎么加用例」；
 目录与各层职责见 `docs/STRUCTURE.md`。
 
@@ -65,6 +68,7 @@ steps:
 | 内容 | 位置 |
 |------|------|
 | 业务链路 DSL | `flows/*.yaml` |
+| DSL 示例 | `examples/example_chat.yaml`（fixture 夹具站点演示，非业务链路） |
 | 命名定位器 | `locators/<page>.yaml`（testid > role+name > placeholder/label > text > css/xpath 候选优先级） |
 | 页面动作 | `src/apw/pages/`（Page Object，平台无关） |
 | 环境配置 | `configs/envs/<env>.yaml`（`--apw-env` 选择） |
@@ -78,7 +82,8 @@ Allure 集成（可选）：默认无需 Allure 工具链；需要 Allure 平台
 ## 常用命令
 
 ```powershell
-pytest flows --apw-env fixture -k example   # 按环境/关键字过滤
+pytest flows --apw-env fixture -m "not slow"  # 按 marker 筛选（fixture 环境下不匹配项自动 skip）
+pytest --apw-flows-dir examples examples     # DSL 示例（fixture 本地夹具站点）
 pytest flows --apw-env test                 # 真实测试环境（表单登录自动完成）
 # 桌面端（Electron 客户端先带调试端口启动：<app>.exe --remote-debugging-port=9333）
 pytest flows/desktop_chat_smoke.yaml --apw-env desktop

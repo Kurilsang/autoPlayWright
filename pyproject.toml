@@ -1,7 +1,7 @@
 [project]
 name = "apw"
 version = "0.1.0"
-description = "Agent 产品 UI 自动化测试框架：DSL 驱动、Web/Electron 双平台、AI 辅助生成"
+description = "Agent 产品 UI 自动化测试框架：YAML 编排 + 页面原语判定、Web/Electron 双平台、AI 辅助生成"
 requires-python = ">=3.11"
 dependencies = [
     "playwright>=1.45",

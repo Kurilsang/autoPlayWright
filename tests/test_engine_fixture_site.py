@@ -24,7 +24,7 @@ def runner(apw_driver, apw_repo, apw_pages, tmp_path):
 
 class TestExampleFlow:
     def test_passes_end_to_end(self, runner):
-        spec = load_flow(Path("flows/example_chat.yaml"))
+        spec = load_flow(Path("examples/example_chat.yaml"))
         result = runner.run(spec)
         assert result.status == "passed", result.model_dump_json(indent=2)
         assert [e.status for e in result.events] == ["passed"] * 6 + ["planned"]
@@ -36,7 +36,7 @@ class TestExampleFlow:
 
         reporter = JsonReporter(tmp_path / "reports")
         runner.reporter = reporter
-        spec = load_flow(Path("flows/example_chat.yaml"))
+        spec = load_flow(Path("examples/example_chat.yaml"))
         runner.run(spec)
         summary = reporter.write_summary()
         assert summary and summary.exists()
@@ -102,7 +102,7 @@ class TestStepContext:
             yield
 
         runner.step_cm_factory = factory
-        spec = load_flow(Path("flows/example_chat.yaml"))
+        spec = load_flow(Path("examples/example_chat.yaml"))
         result = runner.run(spec)
         assert result.status == "passed"
         assert titles == [
@@ -119,7 +119,7 @@ class TestEvidenceCapture:
     """动作返回的结构化采集数据（对话上下文）进事件证据，供报告核对输入输出。"""
 
     def test_capture_context_records_turns(self, runner):
-        spec = load_flow(Path("flows/example_chat.yaml"))
+        spec = load_flow(Path("examples/example_chat.yaml"))
         result = runner.run(spec)
         assert result.status == "passed"
         capture = next(
@@ -133,7 +133,7 @@ class TestEvidenceCapture:
         assert capture.evidence["url"] and capture.evidence["captured_at"]
 
     def test_non_capture_action_has_empty_evidence(self, runner):
-        spec = load_flow(Path("flows/example_chat.yaml"))
+        spec = load_flow(Path("examples/example_chat.yaml"))
         result = runner.run(spec)
         send = next(e for e in result.events if e.detail.endswith("send_message"))
         assert send.evidence == {}

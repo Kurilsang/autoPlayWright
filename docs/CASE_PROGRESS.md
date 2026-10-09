@@ -2,11 +2,12 @@
 
 业务链路（`flows/*.yaml`）与框架自测（`tests/`）的清单与状态。新增/改动用例后同步本页；
 链路数量以收集结果为准：`pytest flows --collect-only -q`、`pytest tests --collect-only -q`。
+DSL 示例（`examples/`，fixture 夹具站点演示）不计业务链路。
 
 > 判定口径、失败取证规则、已知产品缺陷的完整叙述以 `AGENTS.md` 为准，本页只做清单与进度映射。
 
-**统计（2026-10-09）**：业务链路 13 条（真实/桌面环境 12 条 + fixture 示例 1 条）；
-框架自测 13 个文件 84 个用例。测试基线：`pytest tests` 全绿；真实环境链路均已 3 次绿跑。
+**统计（2026-10-09）**：业务链路 12 条（`flows/`，真实/桌面环境）；DSL 示例 1 条（`examples/`）；
+框架自测 14 个文件 90 个用例。测试基线：`pytest tests` 全绿；真实环境链路均已 3 次绿跑。
 
 ## 一、业务链路清单
 
@@ -17,7 +18,8 @@
 | `aml_chat_smoke.yaml` | aml-chat-smoke | web / test | 14 | 新建对话 → 发送 → 完整回答判定 → `capture_context` 证据 | 真实环境持续绿灯（2026-09-22 交付） |
 | `chat_concurrent_switch.yaml` | chat-concurrent-switch | web / test | 21 | 双会话并行生成 + 来回切换逐会话身份核对（URL 锚点 / 输入回显 / 对方标记零混入） | 3 次绿跑（2026-09-28） |
 | `desktop_chat_smoke.yaml` | desktop-chat-smoke | desktop / desktop | 13 | 桌面客户端：新建任务 → 发送 → 完整回答判定 → Thought 展开核对 | 3 次绿跑（2026-10-08） |
-| `example_chat.yaml` | example-chat | web / fixture | 7 | 示例链路（本地夹具站点，DSL 范例 + 引擎端到端素材） | 随 `pytest tests` 端到端覆盖 |
+
+> DSL 示例：`examples/example_chat.yaml`（id=example-chat，fixture 夹具站点，7 步）——DSL 范例 + 引擎端到端素材，随 `pytest tests` 覆盖，不计业务链路。
 
 ### 工作流（/workflows 编辑器）
 
@@ -48,6 +50,7 @@
 | `test_sanitize.py` | 脱敏器：敏感串→占位符、结构保留、映射加载 | 11 |
 | `test_probe_page.py` | 探查原语（生成侧）+ 爬虫 probe 通道 | 9 |
 | `test_base_page.py` | BasePage 纯函数：未达成归因分类、标记段拆分 | 8 |
+| `test_signal_watch.py` | SignalWatch 多信号收敛判定：gate/稳定采样/提前收场、失败取证形制 | 6 |
 | `test_crawler_schema.py` | 爬虫配置与快照 schema | 5 |
 | `test_crawler_fixture_site.py` | 爬虫端到端：状态推进→逐状态快照（票 06） | 3 |
 | `test_json_report.py` | run 目录唯一化 + 汇总合并语义 | 3 |

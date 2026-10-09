@@ -13,6 +13,8 @@ allure-combineReport/
 dist/
 build/
 *.egg-info/
+video/
+run_video.bat
 configs/secrets.local.yaml
 configs/desktop.local.bat
 configs/auth-state.json

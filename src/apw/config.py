@@ -1,6 +1,7 @@
 """环境与驱动配置：configs/envs/<env>.yaml → EnvConfig。"""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Literal
 
@@ -58,7 +59,12 @@ def load_env(env: str, config_dir: str | Path = "configs/envs") -> EnvConfig:
     if not path.exists():
         raise FileNotFoundError(f"环境配置不存在: {path}")
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    return EnvConfig.model_validate({**data, "name": env})
+    cfg = EnvConfig.model_validate({**data, "name": env})
+    # 本地端口差异走环境变量覆盖（如默认调试端口被占用时换端口），入库配置保持默认口径
+    endpoint = os.environ.get("APW_CDP_ENDPOINT", "").strip()
+    if endpoint:
+        cfg.driver.electron.cdp_endpoint = endpoint
+    return cfg
 
 
 def resolve_base_url(env: EnvConfig, root: str | Path = ".") -> str:

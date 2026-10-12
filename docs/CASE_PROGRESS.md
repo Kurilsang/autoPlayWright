@@ -6,7 +6,7 @@ DSL 示例（`examples/`，fixture 夹具站点演示）不计业务链路。
 
 > 判定口径、失败取证规则、已知产品缺陷的完整叙述以 `AGENTS.md` 为准，本页只做清单与进度映射。
 
-**统计（2026-10-12）**：业务链路 14 条（`flows/`，真实/桌面环境）；DSL 示例 1 条（`examples/`）；
+**统计（2026-10-12）**：业务链路 16 条（`flows/`，真实/桌面环境）；DSL 示例 1 条（`examples/`）；
 框架自测 14 个文件 90 个用例。测试基线：`pytest tests` 全绿；真实环境链路均已 3 次绿跑。
 
 ## 一、业务链路清单
@@ -36,6 +36,8 @@ DSL 示例（`examples/`，fixture 夹具站点演示）不计业务链路。
 |------|----|-----------|------|----------|------|
 | `desktop_workflow_manual.yaml` | desktop-workflow-manual | desktop / desktop | 15 | 打开运行：新建 → CodeMirror 写码保存 → 运行视图 → 运行完成（非 AI 编码） | 3 次绿跑（2026-10-12 交付） |
 | `desktop_workflow_concurrent_switch.yaml` | desktop-workflow-concurrent-switch | desktop / desktop | 28 | 并行工作切换：双工作流并行运行 + 来回切换逐工作流身份核对（标题/脚本节点/日志名行，对方标记零混入） | 3 次绿跑（2026-10-12 交付） |
+| `desktop_workflow_ai_coding.yaml` | desktop-workflow-ai-coding | desktop / desktop | 16 | AI 编写生成工作流并运行（需求回显/助手轮/结构落盘 + 运行完成） | 3 次绿跑（2026-10-12 交付） |
+| `desktop_workflow_ai_concurrent_switch.yaml` | desktop-workflow-ai-concurrent-switch | desktop / desktop | 26 | 并行 AI 生成切换：双工作流后台并行生成 + 来回切换逐工作流身份核对（需求回显 + 对方标记零混入） | 3 次绿跑（2026-10-12 交付；1 次踩中空壳轮缺陷判 fail 取证，见已知表） |
 
 ### 广场与场景
 
@@ -65,12 +67,13 @@ DSL 示例（`examples/`，fixture 夹具站点演示）不计业务链路。
 | `test_plugin_skip_report.py` | 插件跳过留痕贯通到 run 汇总 | 1 |
 | `test_real_login.py` | T01 真实环境登录连通冒烟（仅 `--apw-env test` 执行，其余环境 skip 留痕） | 1 |
 | `test_no_secrets.py` | 入库红线门禁：无内网 IP / 凭据值 / 产品名 | 1 |
-| **合计** | | **84** |
+| **合计** | | **90** |
 
 ## 三、判定与取证口径（摘要）
 
 - 回复判定：web 端 = 完整回答六信号；桌面端 = 停止生成消失 / 回答气泡 / Thought 块在场 / 操作行 / 稳定 + `expand_thinking` 展开核对。
 - 工作流运行判定（桌面端）：运行记录挂载 + 「取消运行」清除 + 完成徽标 + 「✅ 工作流完成」完成行 + 日志稳定收敛。
+- AI 生成判定（桌面端）：「停止」消失 + 「发送」回归 + 助手消息轮渲染完整（空壳轮不算）+ 脚本落盘解析 + 面板内容稳定；生成后台执行切走不中断，需求回显气泡 = 确定性身份锚点。
 - 只断言确定性内容（组件/状态/结构）；LLM 产出只进 `capture_context` 证据。
 - 失败即取证、禁止自愈：EvidenceError 带归因分类 + 复现 + 信号时间线 + 冻结截图。
 - 平台矩阵：`platforms: [desktop]` 的链路在 web 环境自动 skip 并留痕。
@@ -88,6 +91,8 @@ DSL 示例（`examples/`，fixture 夹具站点演示）不计业务链路。
 | CodeMirror 编辑器逐键插入触发自动缩进 | desktop_workflow_manual、desktop_workflow_concurrent_switch | 脚本整体 insert_text 插入 |
 | 会话标题异步生效（分钟级滞后） | chat_concurrent_switch | 会话 URL 作身份锚点，标题仅辅助 |
 | 桌面端纯寒暄偶发缺 Thought 块 | desktop_chat_smoke | 用推理型消息保证思考块渲染（待产品侧确认） |
+| 桌面端 AI 编写助手轮偶发空壳渲染（Thought/工具/正文全缺、脚本照常落盘；竞态窗口≈生成完成边界附近打开面板） | desktop_workflow_ai_concurrent_switch | 判 fail 冻结取证（空壳轮不算渲染完整），不重试跑绿（2026-10-12 实测，待产品侧修复） |
+| 桌面端 AI 生成后台执行、会话按工作流各归各 | desktop_workflow_ai_coding、desktop_workflow_ai_concurrent_switch | 发完即走 + 切换接力 `wait_gen_done`；需求回显气泡作身份锚点，对方标记零混入 |
 
 ## 五、待办与下一步
 

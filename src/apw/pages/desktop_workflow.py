@@ -9,6 +9,11 @@
 - 运行 = 详情「运行」开运行视图（运行输入/历史运行）→ 再点「运行」执行；运行后台
   执行、视图切走不中断（卡片「进行中」+「最近运行：运行中」在场）——并行工作切换的载体；
 - 身份锚点 = 详情标题 h3 / 运行视图标题 / 运行日志「工作流开始：<名>」行。
+- 「AI 编写」= 脚本面板开关，展开 aside.wf-author 助手面板（需求 textarea + 发送钮）；
+  生成中「发送」钮变「停止」，生成完成 = 停止消失 + 发送回归 + 脚本落盘解析（自动保存
+  校验，成功提示为瞬态仅观察；面板状态点 is-streaming/is-done 同步流转，仅采证）；
+  AI 生成同样后台执行、切走不中断，会话按工作流各归各
+  （需求回显气泡是确定性身份锚点）。
 判定语义沉淀在此；失败即取证，不自愈。
 """
 from __future__ import annotations
@@ -26,7 +31,7 @@ MANUAL_SCRIPT = (
     '        wf.set_output("greeting", "hello")\n'
 )
 
-# 结构采集 DOM 内省：活动 view slot 的身份/脚本/流程摘要/运行日志 + 后台运行卡片（证据，不断言）
+# 结构采集 DOM 内省：活动槽身份/脚本/流程摘要/运行日志/AI 会话 + 后台运行卡片（证据，不断言）
 _CAPTURE_JS = """
 () => {
   const active = document.querySelector('div.wf-view-slot.is-active') || document.body;
@@ -36,6 +41,13 @@ _CAPTURE_JS = """
   const summary = active.querySelector('span.wf-run-flow-summary');
   const logs = [...active.querySelectorAll('div.wf-log-body div.wf-log-line')]
     .map(el => (el.textContent || '').trim());
+  const aiMsgs = [...active.querySelectorAll('div.wf-author-messages > div')].map(el => ({
+    role: el.classList.contains('user') ? 'user' : 'assistant',
+    text: (el.innerText || '').trim().slice(0, 400),
+  }));
+  const aiTools = [...active.querySelectorAll('div.wf-author-messages span.msg-tool-title')]
+    .map(el => (el.textContent || '').trim()).filter(Boolean);
+  const aiDot = active.querySelector('aside.wf-author span.wf-author-status-dot');
   const running = [...document.querySelectorAll('li.wf-card')]
     .filter(card => card.querySelector('span.wf-run-state.is-running, span.wf-badge-running'))
     .map(card => {
@@ -47,6 +59,9 @@ _CAPTURE_JS = """
     script: code ? (code.innerText || '') : '',
     flow_summary: summary ? (summary.textContent || '').trim() : '',
     run_log: logs.slice(-40).join('\\n'),
+    ai_messages: aiMsgs,
+    ai_tools: aiTools,
+    ai_status: aiDot ? [...aiDot.classList].filter(c => c.startsWith('is-')).join(',') : '',
     cards_running: running,
   };
 }
@@ -60,6 +75,15 @@ def classify_run_failure(signals: dict) -> tuple[str, str]:
     if not signals.get("run_status_present", True):
         return "run_no_record", "运行状态区缺失：运行记录未挂载（启动失败或记录丢失）"
     return "run_incomplete", "完成信号未达成（无「工作流完成」完成行或完成徽标，半截/失败结束）"
+
+
+def classify_gen_failure(signals: dict) -> tuple[str, str]:
+    """归因「AI 生成未达成」：(分类, 说明)。"""
+    if not signals.get("stop_cleared", True):
+        return "gen_stuck", "「停止」持续在场：生成未结束（生成会话卡死或超长）"
+    if not signals.get("assistant_message", True):
+        return "gen_incomplete", "生成已结束但助手无响应消息（半截/静默失败）"
+    return "gen_incomplete", "生成会话已结束但脚本未落盘解析（编辑器未更新）：静默失败"
 
 
 class DesktopWorkflowPage(BasePage):
@@ -278,6 +302,162 @@ class DesktopWorkflowPage(BasePage):
             return self.loc("save_button").is_disabled()
         except Exception:  # noqa: BLE001 - 未就绪继续轮询
             return False
+
+    # ---- AI 编写：需求生成 ----
+    def open_ai_panel(self, timeout_ms: int = 5_000) -> dict:
+        """展开「AI 编写」助手面板（幂等：已展开直接返回）。"""
+        if self.count("ai_panel") > 0:
+            return {"ai_panel": "already_open"}
+        self.dismiss_toasts()
+        self.loc("ai_panel_toggle").click(timeout=timeout_ms)
+        if not self.wait_until(
+            lambda: self.count("ai_panel") > 0, timeout_ms=timeout_ms
+        ):
+            self.fail_evidence(
+                "AI 编写面板未打开",
+                classification="not_ready",
+                cause="点击「AI 编写」后助手面板未渲染",
+                repro={"url": self.page.url, "steps": "open_ai_panel"},
+                detail=f"{timeout_ms}ms 内 aside.wf-author 未出现，页面原状冻结",
+                shot_name="ai-panel-not-open",
+            )
+        return {"ai_panel": "opened"}
+
+    def send_ai_prompt(self, prompt: str, timeout_ms: int = 10_000) -> dict:
+        """向 AI 编写助手提交需求（真实键入 + 发送钮），返回提交落定证据。
+
+        提交落定 = 需求回显气泡在场（新增一条）；未落列即判失败取证（不静默）。
+        生成完成不在本步等待——并行生成用例需要发完即走（wait_gen_done 接力判定）。
+        """
+        self.open_ai_panel()
+        before = self.count("ai_user_message")
+        box = self.loc("ai_prompt_input")
+        box.click()
+        box.type(prompt, delay=20)  # 真实键入（同 React 受控输入陷阱）
+        self.dismiss_toasts()
+        try:
+            self.loc("ai_send_button").click(timeout=5_000)
+        except Exception as exc:  # noqa: BLE001
+            self.fail_evidence(
+                "需求未提交",
+                classification="not_ready",
+                cause="「发送」按钮不可用",
+                repro={"url": self.page.url, "steps": "send_ai_prompt"},
+                detail="常见：输入为空 / 生成中被「停止」替换",
+                shot_name="ai-prompt-not-sent",
+                from_exc=exc,
+            )
+        if not self.wait_until(
+            lambda: self.count("ai_user_message") > before, timeout_ms=timeout_ms
+        ):
+            self.fail_evidence(
+                "需求未落列",
+                classification="gen_not_started",
+                cause="发送后需求回显气泡未出现（提交链路异常）",
+                repro={"url": self.page.url, "steps": "send_ai_prompt"},
+                detail=f"{timeout_ms}ms 内消息区未新增用户气泡，页面原状冻结",
+                shot_name="ai-prompt-not-echoed",
+            )
+        return {"prompt": prompt, "submitted": True}
+
+    def generate_ai(self, prompt: str, timeout_ms: int = 180_000) -> dict:
+        """AI 编写：提交需求生成/改写工作流（语义原语：链路级完成判定 + 取证）。"""
+        submitted = self.send_ai_prompt(prompt)
+        result = self.wait_gen_done(timeout_ms)
+        try:
+            result.update(self.capture_context())
+        except Exception:  # noqa: BLE001
+            pass
+        return {**submitted, **result}
+
+    def _script_applied(self) -> bool:
+        """脚本已落盘解析（持久信号组合，均不依赖 LLM 措辞）：
+
+        流程结构解析出节点 / 「Save script」工具调用在场 / 自动保存成功提示（瞬态兜底）。
+        不用「保存」按钮 disabled 作信号——新建工作流初始即干净，会误判已落盘。
+        """
+        return (
+            self.count("flow_node") > 0
+            or self.count("ai_save_tool") > 0
+            or self.count("ai_saved_notice") > 0
+        )
+
+    def _assistant_turn_ready(self) -> bool:
+        """助手消息轮「渲染完整」：在场 + 非空 + 可见。
+
+        空壳 div（零高度、无正文）不算——竞态下半截渲染会留下空壳轮
+        （2026-10-12 实测：生成完成边界附近打开面板，Thought/工具/正文全缺，
+        脚本照常落盘），count 判定会被它骗过。
+        """
+        try:
+            return self.page.evaluate(
+                "() => [...document.querySelectorAll('div.wf-view-slot.is-active"
+                " div.wf-author-messages div.message.assistant.wf-author-turn')]"
+                ".some(el => el.getBoundingClientRect().height > 0"
+                " && (el.innerText || '').trim().length > 0)"
+            )
+        except Exception:  # noqa: BLE001 - 未就绪按未渲染处理
+            return False
+
+    def wait_gen_done(self, timeout_ms: int = 180_000) -> dict:
+        """等待「AI 生成完成」（判定信号缺一不可，内容稳定收敛才算完成）：
+
+        1. 「停止」消失 + 「发送」回归：生成会话已结束（生成中「发送」钮变「停止」）
+        2. 助手响应消息渲染完整：生成有始有终（半截/静默失败缺此信号，空壳轮不算）
+        3. 脚本落盘解析：流程节点 / 「Save script」调用 / 自动保存提示（改写后直接保存并校验）
+        4. 面板内容长度连续 3 次采样不变（内容稳定）
+
+        已稳定 5 采样仍缺结构信号 = 半截生成，立即取证（不空等满超时）。
+        生成是后台任务（切走不中断），切换回来接力判定同样适用；未达成即判失败，
+        绝不自愈重载（页面原状冻结）。
+        """
+        stall_shot = ""
+
+        def on_tick(w: SignalWatch) -> None:
+            nonlocal stall_shot
+            # 长时间无助手响应 = 生成卡死现场，冻结一份快照供归因
+            if (
+                not stall_shot
+                and not w.signals.get("stop_cleared")
+                and not w.signals.get("assistant_message")
+                and w.elapsed_s > 60
+            ):
+                stall_shot = self.snap("gen-stall-onset")
+
+        watch = self.watch_signals(
+            signals=lambda: {
+                "stop_cleared": self.count("ai_stop_button") == 0,
+                "send_back": self.count("ai_send_button") > 0,
+                "assistant_message": self._assistant_turn_ready(),
+                "script_applied": self._script_applied(),
+            },
+            size=lambda: self.page.evaluate(
+                "() => { const m = document.querySelector('div.wf-author-messages');"
+                " return m ? (m.innerText || '').length : 0; }"
+            ),
+            timeout_ms=timeout_ms,
+            size_field="panel_len",
+            gate=["stop_cleared", "send_back", "assistant_message", "script_applied"],
+            # 稳定计数只认「生成已结束」：结构信号长期缺失时由 give_up 提前收场
+            stability_gate=lambda s: s.get("stop_cleared", False),
+            on_tick=on_tick,
+            give_up=lambda w: w.stable >= 5,  # 已稳定仍缺结构 = 半截生成，立即取证
+        )
+        if watch.settled:
+            evidence = {"gen_signals": watch.signals, "timeline": watch.timeline[-5:]}
+            try:
+                evidence.update(self.capture_context())
+            except Exception:  # noqa: BLE001
+                pass
+            return evidence
+        self.fail_incomplete(
+            "AI 生成未达成",
+            classify=classify_gen_failure,
+            watch=watch,
+            steps="open_ai_panel → send_ai_prompt → wait_gen_done",
+            observed=f"需求提交后 {timeout_ms}ms 内完成信号未达成",
+            freeze_shots=[stall_shot],
+        )
 
     # ---- 运行 ----
     def open_run_view(self, timeout_ms: int = 10_000) -> dict:

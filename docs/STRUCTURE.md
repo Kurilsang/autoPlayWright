@@ -20,6 +20,8 @@ autoPlayWright/
 ├─ run_debug.bat           一键调试：单条/筛选链路，窗口可见 + 250ms 慢动作
 ├─ run_full_debug.bat      全量调试：跑全部用例；桌面端自动带 --remote-debugging-port=9333 拉起客户端
 ├─ run_slides.bat          打开 docs/banner-light.html 项目报告页
+├─ setup_linux.sh          Linux 一次性安装：venv + 依赖 + Playwright chromium（--with-deps 装系统库）
+├─ run_flows.sh            Linux/服务器跑网页端链路：默认无头，--debug 转调试模式，透传 pytest 参数
 ├─ pyproject.toml          包定义 + pytest11 插件入口
 ├─ README.md               使用入口（安装、配置、常用命令）
 └─ AGENTS.md               Agent 规则：硬约束、新页面五步走、已知产品行为/缺陷

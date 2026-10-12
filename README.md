@@ -25,6 +25,10 @@ python -m venv .venv
 .venv\Scripts\pytest tests flows
 ```
 
+Linux / 服务器（网页端）：`bash setup_linux.sh --with-deps` 一键装好（venv + 依赖 + Playwright chromium），
+`bash run_flows.sh` 无头跑业务链路（`--debug` 转窗口可见 + 慢动作，其余参数透传 pytest）。
+容器以 root 跑 Chromium 需加启动参数：`APW_CHROMIUM_ARGS="--no-sandbox --disable-dev-shm-usage" bash run_flows.sh`。
+
 ## 环境配置（跑非 fixture 环境前）
 
 - **fixture（默认）**：零配置，`pytest flows` 走本地夹具站点。

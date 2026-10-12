@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import shlex
 from pathlib import Path
 from typing import Literal
 
@@ -44,6 +45,8 @@ class DriverConfig(BaseModel):
     channel: str = ""  # 例如 "msedge" 使用系统浏览器，空则用 Playwright 内置 chromium
     headless: bool = True
     slow_mo: int = 0  # 每个 Playwright 动作间的延迟 ms，调试放慢用
+    # chromium 启动参数透传（Linux 容器 root 需 --no-sandbox），亦可 APW_CHROMIUM_ARGS 追加
+    args: list[str] = Field(default_factory=list)
     electron: ElectronConfig = Field(default_factory=ElectronConfig)
 
 
@@ -64,6 +67,10 @@ def load_env(env: str, config_dir: str | Path = "configs/envs") -> EnvConfig:
     endpoint = os.environ.get("APW_CDP_ENDPOINT", "").strip()
     if endpoint:
         cfg.driver.electron.cdp_endpoint = endpoint
+    # 浏览器启动参数走环境变量追加（如 Linux 容器 root 跑需 --no-sandbox），shell 风格分词
+    extra_args = os.environ.get("APW_CHROMIUM_ARGS", "").strip()
+    if extra_args:
+        cfg.driver.args.extend(shlex.split(extra_args))
     return cfg
 
 

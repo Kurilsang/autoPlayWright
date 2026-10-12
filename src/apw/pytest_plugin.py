@@ -73,21 +73,24 @@ def get_runtime(config) -> ApwRuntime:
     from apw.locators.repo import LocatorRepo
     from apw.reporter.json_report import JsonReporter
 
-    env = load_env(config.getoption("--apw-env"))
+    # 资产路径（环境配置/定位器/报告/夹具 base_url）一律锚定仓库根，
+    # 不依赖调用时的 CWD（服务器上 cron/systemd/CI 从任意目录调用均一致）
+    root = Path(config.rootpath)
+    env = load_env(config.getoption("--apw-env"), config_dir=root / "configs/envs")
     # 调试开关（CLI）覆盖环境配置
     if config.getoption("--apw-headed"):
         env.driver.headless = False
     slow_mo = config.getoption("--apw-slowmo")
     if slow_mo:
         env.driver.slow_mo = slow_mo
-    driver = AppDriver(env=env)
+    driver = AppDriver(env=env, root=str(root))
     driver.start()
     rt = ApwRuntime(
         env=env,
         driver=driver,
-        repo=LocatorRepo.load(Path("locators")),
+        repo=LocatorRepo.load(root / "locators"),
         pages=default_registry(),
-        reporter=JsonReporter(config.getoption("--apw-reports-dir")),
+        reporter=JsonReporter(str(root / config.getoption("--apw-reports-dir"))),
     )
     config.stash[_RUNTIME_KEY] = rt
     return rt

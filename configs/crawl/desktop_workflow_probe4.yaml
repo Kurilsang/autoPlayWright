@@ -1,0 +1,84 @@
+# 桌面客户端工作流链路第四轮探查（生成侧资产）：
+# A) 慢脚本运行截「运行中」UI（完成判定信号候选）；
+# B) 连开两个工作流看 view slot 栈与「← 返回」切换语义（并行工作切换载体）。
+# 产物入 .scratch/autoPlayWright/snapshots/desktop/（gitignored，落盘自动脱敏）。
+name: desktop-workflow-probe4
+targets:
+  - id: desktop-wf-slowrun-switch
+    route: ""
+    steps:
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "div.integration-toast button[aria-label='关闭']" }, optional: true, timeout_ms: 2000 } }
+        label: toast_dismissed
+      # 当前在 probe2 工作流的运行视图 → 返回详情
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "div.wf-view-slot.is-active button:text-is('← 返回')" }, timeout_ms: 5000 } }
+        label: back_to_detail
+        capture: true
+      # 清空重写慢脚本（先 Ctrl+A 选中再整体插入）
+      - do: { page: probe, action: press, args: { key: "Control+a", selector: { by: css, value: "section.wf-detail-script .cm-content" }, timeout_ms: 5000 } }
+        label: code_selected
+      - do: { page: probe, action: insert, args: { selector: null, text: "def main(wf):\n    import time\n    with wf.step(\"n1\", \"慢速步骤\"):\n        time.sleep(20)\n        wf.log(\"slow-done\")\n", timeout_ms: 5000 } }
+        label: slow_script_typed
+        capture: true
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "section.wf-detail-script button:text-is('保存')" }, timeout_ms: 5000 } }
+        label: saved
+      - do: { page: probe, action: wait, args: { ms: 2500 } }
+        label: saved_state
+        capture: true
+      # 运行视图 → 执行慢脚本
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "div.wf-view-slot.is-active div.wf-subheader button.btn-primary:text-is('运行')" }, timeout_ms: 5000 } }
+        label: run_view_opened
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "div.wf-view-slot.is-active section[aria-label='运行输入'] button.btn-primary:text-is('运行')" }, timeout_ms: 5000 } }
+        label: run_started
+      - do: { page: probe, action: wait, args: { ms: 3000 } }
+        label: running_state
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "wf4_running" } }
+        label: dom_running
+      - do: { page: probe, action: wait, args: { ms: 25000 } }
+        label: run_done_state
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "wf4_run_done" } }
+        label: dom_run_done
+      # ---- 切换语义：层层返回列表，再连开两个工作流 ----
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "div.wf-view-slot.is-active button:text-is('← 返回')" }, timeout_ms: 5000 } }
+        label: back_to_detail_2
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "div.wf-view-slot.is-active button:text-is('← 返回')" }, timeout_ms: 5000 } }
+        label: back_to_list
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "wf4_list" } }
+        label: dom_list
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "li.wf-card:has(.wf-card-name:text-is('工作流4号')) button:text-is('打开')" }, timeout_ms: 5000 } }
+        label: open_wf4
+      - do: { page: probe, action: wait, args: { ms: 1500 } }
+        label: wf4_detail_state
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "wf4_detail" } }
+        label: dom_wf4_detail
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "li.wf-card:has(.wf-card-name:text-is('工作流3号')) button:text-is('打开')" }, timeout_ms: 5000 } }
+        label: open_wf3
+      - do: { page: probe, action: wait, args: { ms: 1500 } }
+        label: wf3_detail_state
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "wf3_detail" } }
+        label: dom_wf3_detail
+      # 返回 = 回到上一个 view slot？（并行切换关键语义）
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "div.wf-view-slot.is-active button:text-is('← 返回')" }, timeout_ms: 5000 } }
+        label: back_switch
+      - do: { page: probe, action: wait, args: { ms: 1500 } }
+        label: back_switch_state
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "wf4_back_switch" } }
+        label: dom_back_switch
+    signals:
+      - name: run_running_marker
+        selector: { by: text, value: 运行中, exact: false }
+      - name: run_done_marker
+        selector: { by: text, value: 已完成, exact: false }
+      - name: run_cancel_marker
+        selector: { by: text, value: 取消, exact: false }
+      - name: run_status_section
+        selector: { by: css, value: "section.wf-run-status" }
+      - name: flow_node_slow
+        selector: { by: text, value: 慢速步骤 }
+      - name: active_title
+        selector: { by: css, value: "div.wf-view-slot.is-active h3" }

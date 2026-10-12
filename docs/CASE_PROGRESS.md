@@ -6,7 +6,7 @@ DSL 示例（`examples/`，fixture 夹具站点演示）不计业务链路。
 
 > 判定口径、失败取证规则、已知产品缺陷的完整叙述以 `AGENTS.md` 为准，本页只做清单与进度映射。
 
-**统计（2026-10-09）**：业务链路 12 条（`flows/`，真实/桌面环境）；DSL 示例 1 条（`examples/`）；
+**统计（2026-10-12）**：业务链路 14 条（`flows/`，真实/桌面环境）；DSL 示例 1 条（`examples/`）；
 框架自测 14 个文件 90 个用例。测试基线：`pytest tests` 全绿；真实环境链路均已 3 次绿跑。
 
 ## 一、业务链路清单
@@ -29,6 +29,13 @@ DSL 示例（`examples/`，fixture 夹具站点演示）不计业务链路。
 | `workflow_ai_coding.yaml` | workflow-ai-coding | web / test | 10 | AI 编写生成工作流并运行 | 3 次绿跑（2026-09-24 交付） |
 | `workflow_ai_concurrent_publish.yaml` | workflow-ai-concurrent-publish | web / test | 5 | 并发 2 个 AI 生成任务，逐标签身份核对（串台/卡死判 fail 冻结取证） | 3 次绿跑（2026-09-24 交付） |
 | `workflow_ai_concurrent_run.yaml` | workflow-ai-concurrent-run | web / test | 5 | 并发 2 个 AI 运行任务，逐标签身份核对 | 3 次绿跑（2026-09-24 交付） |
+
+### 工作流（桌面客户端工作流面板）
+
+| flow | id | 平台/环境 | 步数 | 覆盖场景 | 状态 |
+|------|----|-----------|------|----------|------|
+| `desktop_workflow_manual.yaml` | desktop-workflow-manual | desktop / desktop | 15 | 打开运行：新建 → CodeMirror 写码保存 → 运行视图 → 运行完成（非 AI 编码） | 3 次绿跑（2026-10-12 交付） |
+| `desktop_workflow_concurrent_switch.yaml` | desktop-workflow-concurrent-switch | desktop / desktop | 28 | 并行工作切换：双工作流并行运行 + 来回切换逐工作流身份核对（标题/脚本节点/日志名行，对方标记零混入） | 3 次绿跑（2026-10-12 交付） |
 
 ### 广场与场景
 
@@ -63,6 +70,7 @@ DSL 示例（`examples/`，fixture 夹具站点演示）不计业务链路。
 ## 三、判定与取证口径（摘要）
 
 - 回复判定：web 端 = 完整回答六信号；桌面端 = 停止生成消失 / 回答气泡 / Thought 块在场 / 操作行 / 稳定 + `expand_thinking` 展开核对。
+- 工作流运行判定（桌面端）：运行记录挂载 + 「取消运行」清除 + 完成徽标 + 「✅ 工作流完成」完成行 + 日志稳定收敛。
 - 只断言确定性内容（组件/状态/结构）；LLM 产出只进 `capture_context` 证据。
 - 失败即取证、禁止自愈：EvidenceError 带归因分类 + 复现 + 信号时间线 + 冻结截图。
 - 平台矩阵：`platforms: [desktop]` 的链路在 web 环境自动 skip 并留痕。
@@ -75,6 +83,9 @@ DSL 示例（`examples/`，fixture 夹具站点演示）不计业务链路。
 | Skills 广场缺失包下载 404 静默失败 | skill_market_upload_download | 逐卡尝试取一次成功，404 尝试随证据留痕 |
 | 套组英文名/英文描述静默必填 + 提交须停在「基本信息」 | suite_plaza_create、playground_suite_debug | 按产品现状写步骤，不触发静默 no-op |
 | React 受控输入 `fill` 不触发 onChange | workflow_manual、workflow_ai_coding | 输入一律真实键入（type/insert_text） |
+| 桌面端工作流为 view slot 栈 + 运行后台执行（切走不中断） | desktop_workflow_manual、desktop_workflow_concurrent_switch | 切换 = 弹回列表 + 卡片「打开」；身份锚点 = 详情标题 + 脚本节点 + 日志「工作流开始：<名>」 |
+| 桌面端常驻「服务连接异常」toast 拦截点击（关闭钮为图标钮 aria-label=关闭） | desktop_workflow_manual、desktop_workflow_concurrent_switch | 交互前 `dismiss_toasts` 幂等清理 |
+| CodeMirror 编辑器逐键插入触发自动缩进 | desktop_workflow_manual、desktop_workflow_concurrent_switch | 脚本整体 insert_text 插入 |
 | 会话标题异步生效（分钟级滞后） | chat_concurrent_switch | 会话 URL 作身份锚点，标题仅辅助 |
 | 桌面端纯寒暄偶发缺 Thought 块 | desktop_chat_smoke | 用推理型消息保证思考块渲染（待产品侧确认） |
 

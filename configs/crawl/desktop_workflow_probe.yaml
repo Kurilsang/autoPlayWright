@@ -1,0 +1,44 @@
+# 桌面客户端工作流链路首轮探查配置（生成侧资产）：找工作流入口 + 列表 + 新建 + 编辑器结构。
+# 探查期用 probe 保留名通用原语推进状态；定位器与页面对象产品化后步骤替换为 page: <页面名>。
+# 产物入 .scratch/autoPlayWright/snapshots/desktop/（gitignored，落盘自动脱敏）。
+# 注：桌面端 goto_base 不导航（客户端启动即在其 UI），目标自包含、多假设 optional 试错。
+name: desktop-workflow-probe
+targets:
+  - id: desktop-wf-entry
+    route: ""
+    steps:
+      - do: { page: probe, action: wait, args: { ms: 2000 } }
+        label: app_ready
+      - do: { page: probe, action: click, args: { selector: { by: text, value: 工作流, exact: true }, timeout_ms: 5000 } }
+        label: nav_workflow
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "wf_list" } }
+        label: dom_wf_list
+      - do: { page: probe, action: click, args: { selector: { by: text, value: 新建工作流 }, optional: true, timeout_ms: 5000 } }
+        label: new_dialog
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "wf_new_dialog" } }
+        label: dom_wf_new_dialog
+      - do: { page: probe, action: type, args: { selector: { by: placeholder, value: "例如：周报汇总" }, text: "apw-desktop-probe", optional: true, timeout_ms: 4000 } }
+        label: name_typed
+        capture: true
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "div.fixed.inset-0 button:text-is('创建')" }, optional: true, timeout_ms: 4000 } }
+        label: created
+      - do: { page: probe, action: wait, args: { ms: 3000 } }
+        label: editor_state
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "wf_editor" } }
+        label: dom_wf_editor
+    signals:
+      - name: new_workflow_button
+        selector: { by: text, value: 新建工作流 }
+      - name: wf_title_input
+        selector: { by: css, value: "input.font-semibold" }
+      - name: code_edit_toggle
+        selector: { by: text, value: 编辑 }
+      - name: save_button
+        selector: { by: text, value: 保存工作流 }
+      - name: run_button
+        selector: { by: role, value: button, name: 运行 }
+      - name: ai_prompt
+        selector: { by: css, value: "textarea" }

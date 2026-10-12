@@ -1,0 +1,66 @@
+# 桌面客户端工作流链路第三轮探查（生成侧资产）：真实手动写码运行全程。
+# 脚本编辑器是 CodeMirror（.cm-content，整体 insert_text 避免逐键自动缩进）；
+# 运行 = 详情「运行」打开运行视图（运行输入/历史运行）→ 再点「运行」执行。
+# 产物入 .scratch/autoPlayWright/snapshots/desktop/（gitignored，落盘自动脱敏）。
+name: desktop-workflow-probe3
+targets:
+  - id: desktop-wf-manual-run
+    route: ""
+    steps:
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "div.integration-toast button[aria-label='关闭']" }, optional: true, timeout_ms: 2000 } }
+        label: toast_dismissed
+      # 运行视图 → 返回详情（限当前活动 view slot，避免命中隐藏槽的返回钮）
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "div.wf-view-slot.is-active button:text-is('← 返回')" }, timeout_ms: 5000 } }
+        label: back_to_detail
+        capture: true
+      # CodeMirror 整体插入脚本（不触发逐键自动缩进）
+      - do: { page: probe, action: insert, args: { selector: { by: css, value: "section.wf-detail-script .cm-content" }, text: "def main(wf):\n    with wf.step(\"n1\", \"打印 hello\"):\n        wf.log(\"hello\")\n        wf.set_output(\"greeting\", \"hello\")\n", timeout_ms: 5000 } }
+        label: script_typed
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "wf3_typed" } }
+        label: dom_typed
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "section.wf-detail-script button:text-is('保存')" }, timeout_ms: 5000 } }
+        label: saved
+      - do: { page: probe, action: wait, args: { ms: 2500 } }
+        label: saved_state
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "wf3_saved" } }
+        label: dom_saved
+      # 详情「运行」→ 打开运行视图（运行输入）
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "div.wf-view-slot.is-active div.wf-subheader button.btn-primary:text-is('运行')" }, timeout_ms: 5000 } }
+        label: run_view_opened
+      - do: { page: probe, action: wait, args: { ms: 1500 } }
+        label: run_input_state
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "wf3_run_input" } }
+        label: dom_run_input
+      # 运行视图「运行」→ 真正执行
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "div.wf-view-slot.is-active section[aria-label='运行输入'] button.btn-primary:text-is('运行')" }, timeout_ms: 5000 } }
+        label: run_started
+      - do: { page: probe, action: wait, args: { ms: 3000 } }
+        label: running_state
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "wf3_running" } }
+        label: dom_running
+      - do: { page: probe, action: wait, args: { ms: 15000 } }
+        label: run_done_state
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "wf3_run_done" } }
+        label: dom_run_done
+    signals:
+      - name: save_button
+        selector: { by: text, value: 保存 }
+      - name: flow_node_hello
+        selector: { by: text, value: 打印 hello }
+      - name: run_view_marker
+        selector: { by: text, value: 运行输入 }
+      - name: run_idle_marker
+        selector: { by: text, value: 填写输入后点击, exact: false }
+      - name: run_history_marker
+        selector: { by: text, value: 历史运行 }
+      - name: cancel_run_button
+        selector: { by: text, value: 取消运行 }
+      - name: run_completed_badge
+        selector: { by: css, value: "span.wf-run-state.is-completed" }
+      - name: run_failed_badge
+        selector: { by: css, value: "span.wf-run-state.is-failed" }

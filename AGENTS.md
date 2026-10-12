@@ -56,7 +56,7 @@ Python 3.11+ / Playwright（同步 API）/ pytest 9（pytest11 插件入口）/ 
 - 页面对象的等待/判定/取证一律走 BasePage 基建（`settle`/`wait_until`/`SignalWatch` + `fail_evidence`/`fail_incomplete`，D27），不裸写 time.sleep/裸循环/裸拼 EvidenceError
 - **凭据与内部信息永不入库**：账号密码走 `configs/secrets.local.yaml`（gitignored）或 CI 环境变量 `APW_USERNAME`/`APW_PASSWORD`；内网 URL/域名/IP/API/产品名/个人信息在提交内容与快照产物中一律以占位符呈现（环境真实值只在本地 `configs/envs/test.yaml`）；快照/探查产物落盘自动脱敏（`apw.sanitize`，映射 `configs/sanitize.local.yaml` 真实串仅存本地 + 通用模式兜底）；入库红线有机器门禁 `tests/test_no_secrets.py`（内网 IP/凭据值/产品名扫描）
 
-## 当前状态（2026-10-09）
+## 当前状态（2026-10-12）
 
 - 票 01/02 已交付；T07 预演产物已产品化：`locators/aml_chat.yaml` + `AmlChatPage` + `flows/aml_chat_smoke.yaml`（真实环境冒烟持续绿灯）
 - 票 06 爬虫快照器已交付：`python -m apw.crawler` 状态化爬取（D20 快照骨架），产物入 `.scratch/autoPlayWright/snapshots/`；另有 `page: probe` 探查原语（生成侧保留名，goto/click/type/insert/dump_dom，未知页面首轮探查用，流程用例禁用）与 `scripts/snapshot_summary.py` 快照摘要工具；**pending**：票面「快照语义人工检查」未勾
@@ -67,6 +67,7 @@ Python 3.11+ / Playwright（同步 API）/ pytest 9（pytest11 插件入口）/ 
 - 报告样式库链路已交付（2026-09-29）：`flows/report_style_browse.yaml`（进入/预览/标签切换 8 类逐一核对筛选收敛）+ `flows/report_style_copy_run.yaml`（做同款跳转 → 运行 → 工作区产物落位），真实环境 3 次绿跑；`ReportStylePage` + `locators/report_style.yaml`
 - 操练场链路已交付（2026-09-30）：`flows/playground_suite_debug.yaml` 创建私有套组 → 操练场新建会话绑定刚建套组（身份锚三连：unique 名/选择器/「已加载」徽标）→ 测试套组模式简单对话调试（六信号判完成），真实环境 3 次绿跑；`PlaygroundPage` + `locators/playground.yaml`；`SuitePlazaPage.create_suite` 增 `unique` 命名 + `flow_state["suite_name"]` 跨步锚
 - 桌面客户端对话链路已交付（2026-10-08）：`flows/desktop_chat_smoke.yaml` 新建任务 → 发送消息 → 完整回答判定 → Thought 展开核对，真实客户端 3 次绿跑；`DesktopChatPage` + `locators/desktop_chat.yaml` + `configs/envs/desktop.yaml`（CDP attach：客户端带 `--remote-debugging-port=9333` 启动）+ 探查配置 `configs/crawl/desktop_chat_probe{,2,3,4}.yaml`（3/4=Thought 块与展开交互）；平台矩阵生效（`platforms: [desktop]` 在 web 环境自动 skip 留痕）
+- 桌面客户端工作流链路已交付（2026-10-12）：`flows/desktop_workflow_manual.yaml` 打开运行（新建 → CodeMirror 写码保存 → 运行视图 → 运行完成，非 AI 编码）+ `flows/desktop_workflow_concurrent_switch.yaml` 并行工作切换（双工作流并行运行 + 来回切换逐工作流身份核对），真实客户端各 3 次绿跑；`DesktopWorkflowPage` + `locators/desktop_workflow.yaml` + 探查配置 `configs/crawl/desktop_workflow_probe{,2,3,4,5}.yaml`（5=后台运行与切换语义）；桌面端「AI 编写」生成链路未覆盖（后续候选）
 - 回复判定：web 端 = **完整回答六信号**（停止消失/推理步骤/最终答案/操作行/稳定/加载清除）；桌面端 = 停止生成消失/回答气泡/Thought 块在场/操作行/稳定 + `expand_thinking` 展开核对；`capture_context` 把对话上下文（输入/推理步骤/思考过程/最终答案）写入报告证据
 - 失败取证：EvidenceError 带归因分类（hang_loading/streaming_stuck/reply_incomplete/content_unstable/thinking_expand_failed + gen_stuck/gen_incomplete/run_stuck/run_incomplete/identity_mismatch）+ 复现 + 信号时间线 + 冻结截图
 - 测试环境地址在本地 `configs/envs/test.yaml`（gitignored，模板 `test.example.yaml`）；正式环境**勿跑测试/爬取**；测试环境免登录直达会话页
@@ -81,9 +82,10 @@ Python 3.11+ / Playwright（同步 API）/ pytest 9（pytest11 插件入口）/ 
 - 已知框架陷阱：Playwright 同步 API 纯 `time.sleep` 轮询不泵事件循环，`page.url` 会停在旧值（做同款跳转等待曾误判未跳转）——轮询一律走 API 调用（`wait_for_timeout`/`count`/`inner_text`）
 - 已知产品行为：操练场（更多场景→「创作与调试」组）= 套组调试沙箱，会话卡绑一个套组；「新建会话」弹窗（会话名称 + 原生 select 从套组加载）确定后**直接进 IDE**（列表恢复才走「进入调试」）；IDE 两种模式=Agent 助手（读写工作区文件）/▶测试套组（输入用户消息 Enter 运行一次完整推理）；运行日志=「▶ 操练场运行开始」→「Prompt: 回显」→「│」输出行→「✅ 运行完成，用时 Ns，Token: N」，顶栏状态 空闲→已完成
 - 已知产品行为（桌面客户端）：组合器为 contenteditable 富输入（Enter 发送/Shift+Enter 换行，同工作流编辑器陷阱一律真实键入）；生成中发送键变「停止生成」（`button.btn-send.btn-stop`）= 流式信号；Thought 折叠块（`details.msg-thinking`）**正文展开才渲染**（折叠态仅 summary，`expand_thinking` 测展开：summary 点击 → `details[open]` + `.msg-thinking-body`）；完成态=回答气泡 + 完成态操作行；「新任务」清空会话区（未清空判 fail）；无会话 URL，身份锚点=消息 `data-message-id`；会话标题异步生效（生成中带 `.is-generating`）
+- 已知产品行为（桌面客户端工作流）：工作流区是 **view slot 栈**（列表底座 + 详情/运行叠放，「← 返回」回上一槽：详情槽保活、运行槽销毁，同时仅一槽 `is-active`）；**运行后台执行、视图切走不中断**（卡片「进行中」角标 +「最近运行：运行中」）；脚本编辑器=CodeMirror（整体 insert_text，同逐键自动缩进陷阱），保存落定=「保存」按钮转 disabled，流程节点保存后解析；运行=详情「运行」开运行视图（运行输入/历史运行）→ 再点「运行」执行，完成行=「✅ 工作流完成。…」；身份锚点=详情标题 h3 / 运行视图标题 / 日志「工作流开始：<名>」行；常驻「服务连接异常」toast 会拦截下方点击（关闭钮是 `aria-label=关闭` 的图标钮，无文本，`dismiss_toasts` 幂等清）
 - 已知产品缺陷观察（桌面客户端）：纯寒暄偶发走 ~2s 无思考快速路径，回复整条缺 Thought 块（2026-10-08 实测 8 轮中 2 轮，判 fail 取证见 reports/20261008-110107、reports/20261008-112123）；对话用例一律用**推理型消息**保证思考块渲染，该不一致待产品侧确认
-- 仓库与基建口径（2026-10-09）：DSL=编排层、判定语义在页面原语（宣传口径同步修正，D26）；等待/判定/取证收编 BasePage 基建（D27，SignalWatch 多信号收敛 + fail_evidence/fail_incomplete 统一取证，自测 `tests/test_signal_watch.py`）；示例链路移居 `examples/`（业务链路口径 = 12 条）；`video/`+`run_video.bat` 演示资产出库为本地（gitignored）
-- 测试基线：`pytest tests` 全绿（框架自测，含证据链路/失败取证/三态报告/脱敏用例/红线门禁）；工作流 4 条链路 + 对话并行切换 + Skills 广场 + 套组广场 + 报告样式库 2 条 + 操练场真实环境 3 次绿跑 + 桌面端对话冒烟真实客户端 3 次绿跑
+- 仓库与基建口径（2026-10-09）：DSL=编排层、判定语义在页面原语（宣传口径同步修正，D26）；等待/判定/取证收编 BasePage 基建（D27，SignalWatch 多信号收敛 + fail_evidence/fail_incomplete 统一取证，自测 `tests/test_signal_watch.py`）；示例链路移居 `examples/`（业务链路口径 = 14 条）；`video/`+`run_video.bat` 演示资产出库为本地（gitignored）
+- 测试基线：`pytest tests` 全绿（框架自测，含证据链路/失败取证/三态报告/脱敏用例/红线门禁）；工作流 4 条链路 + 对话并行切换 + Skills 广场 + 套组广场 + 报告样式库 2 条 + 操练场真实环境 3 次绿跑 + 桌面端对话冒烟真实客户端 3 次绿跑 + 桌面端工作流 2 条链路真实客户端 3 次绿跑
 - 评审修复批次 P0 已交付（`.scratch/review-p0/`，6 票全 done）：prepare 失败与空步骤终态留痕、报告三态 + 跳过原因、run 目录唯一化 + 汇总合并、快照脱敏管道、定位器计数与解析同链
 - 留空待输入：仅 Electron 安装包 launch（T03；CDP attach 已有真实用例跑通=桌面端对话冒烟）
 - 下一步：评审 P1/P2（见 `.scratch/review-p0/backlog.md`）→ 04 原语库（两档制 + 收口规则）→ 07 生成器（opencode skill）→ 08；业务用例扩量（v1 目标 20~50 条）

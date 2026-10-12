@@ -1,0 +1,140 @@
+# 桌面客户端工作流链路第五轮探查（生成侧资产）：并行工作切换语义。
+# 假设待验证：运行任务在 view slot 销毁后仍后台执行（卡片最近运行徽标 / 重新进入运行视图可接力）；
+# 详情 slot 复用（开 B 替换 A 的详情）；切换 = 返回列表 + 目标卡片「打开」，身份核对看标题与运行日志锚点。
+# 产物入 .scratch/autoPlayWright/snapshots/desktop/（gitignored，落盘自动脱敏）。
+name: desktop-workflow-probe5
+targets:
+  - id: desktop-wf-switch
+    route: ""
+    steps:
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "div.integration-toast button[aria-label='关闭']" }, optional: true, timeout_ms: 2000 } }
+        label: toast_dismissed
+      # 当前详情视图 → 返回列表
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "div.wf-view-slot.is-active button:text-is('← 返回')" }, timeout_ms: 5000 } }
+        label: back_to_list
+      - do: { page: probe, action: wait, args: { ms: 1000 } }
+        label: list_ready
+        capture: true
+      # ---- 建 A：新建 → 写慢脚本甲 → 保存 ----
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "button.btn-primary.wf-btn:text-is('新建工作流')" }, timeout_ms: 5000 } }
+        label: new_dialog_a
+      - do: { page: probe, action: type, args: { selector: { by: placeholder, value: "例如：周报汇总" }, text: "apw-switch-a", timeout_ms: 5000 } }
+        label: name_a_typed
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "div.integration-toast button[aria-label='关闭']" }, optional: true, timeout_ms: 2000 } }
+        label: toast_dismissed_2
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "footer.wf-modal-footer button.btn-primary" }, timeout_ms: 5000 } }
+        label: created_a
+      - do: { page: probe, action: wait, args: { ms: 2000 } }
+        label: detail_a_state
+        capture: true
+      - do: { page: probe, action: press, args: { key: "Control+a", selector: { by: css, value: "section.wf-detail-script .cm-content" }, timeout_ms: 5000 } }
+        label: code_a_selected
+      - do: { page: probe, action: insert, args: { selector: null, text: "def main(wf):\n    import time\n    with wf.step(\"n1\", \"甲甲甲步骤\"):\n        time.sleep(25)\n        wf.log(\"alpha-done-甲甲甲\")\n", timeout_ms: 5000 } }
+        label: script_a_typed
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "section.wf-detail-script button:text-is('保存')" }, timeout_ms: 5000 } }
+        label: saved_a
+      - do: { page: probe, action: wait, args: { ms: 2000 } }
+        label: saved_a_state
+        capture: true
+      # ---- 跑 A：运行视图 → 执行 ----
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "div.wf-view-slot.is-active div.wf-subheader button.btn-primary:text-is('运行')" }, timeout_ms: 5000 } }
+        label: run_view_a
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "div.wf-view-slot.is-active section[aria-label='运行输入'] button.btn-primary:text-is('运行')" }, timeout_ms: 5000 } }
+        label: run_a_started
+      - do: { page: probe, action: wait, args: { ms: 2500 } }
+        label: run_a_running
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "wf5_a_running" } }
+        label: dom_a_running
+      # ---- 切走 A：两级返回列表（运行 slot 销毁），看卡片徽标 ----
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "div.wf-view-slot.is-active button:text-is('← 返回')" }, timeout_ms: 5000 } }
+        label: back_a_to_detail
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "div.wf-view-slot.is-active button:text-is('← 返回')" }, timeout_ms: 5000 } }
+        label: back_a_to_list
+      - do: { page: probe, action: wait, args: { ms: 1000 } }
+        label: list_during_run_a
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "wf5_list_during_run_a" } }
+        label: dom_list_during_run_a
+      # ---- 建 B 并跑 B（A 仍在后台跑）----
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "button.btn-primary.wf-btn:text-is('新建工作流')" }, timeout_ms: 5000 } }
+        label: new_dialog_b
+      - do: { page: probe, action: type, args: { selector: { by: placeholder, value: "例如：周报汇总" }, text: "apw-switch-b", timeout_ms: 5000 } }
+        label: name_b_typed
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "div.integration-toast button[aria-label='关闭']" }, optional: true, timeout_ms: 2000 } }
+        label: toast_dismissed_3
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "footer.wf-modal-footer button.btn-primary" }, timeout_ms: 5000 } }
+        label: created_b
+      - do: { page: probe, action: wait, args: { ms: 2000 } }
+        label: detail_b_state
+        capture: true
+      - do: { page: probe, action: press, args: { key: "Control+a", selector: { by: css, value: "section.wf-detail-script .cm-content" }, timeout_ms: 5000 } }
+        label: code_b_selected
+      - do: { page: probe, action: insert, args: { selector: null, text: "def main(wf):\n    import time\n    with wf.step(\"n1\", \"乙乙乙步骤\"):\n        time.sleep(25)\n        wf.log(\"beta-done-乙乙乙\")\n", timeout_ms: 5000 } }
+        label: script_b_typed
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "section.wf-detail-script button:text-is('保存')" }, timeout_ms: 5000 } }
+        label: saved_b
+      - do: { page: probe, action: wait, args: { ms: 2000 } }
+        label: saved_b_state
+        capture: true
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "div.wf-view-slot.is-active div.wf-subheader button.btn-primary:text-is('运行')" }, timeout_ms: 5000 } }
+        label: run_view_b
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "div.wf-view-slot.is-active section[aria-label='运行输入'] button.btn-primary:text-is('运行')" }, timeout_ms: 5000 } }
+        label: run_b_started
+      - do: { page: probe, action: wait, args: { ms: 2500 } }
+        label: run_b_running
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "wf5_b_running" } }
+        label: dom_b_running
+      # ---- 切回 A：返回列表 → A 卡片「打开」→ 详情身份核对 ----
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "div.wf-view-slot.is-active button:text-is('← 返回')" }, timeout_ms: 5000 } }
+        label: back_b_to_detail
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "div.wf-view-slot.is-active button:text-is('← 返回')" }, timeout_ms: 5000 } }
+        label: back_b_to_list
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "li.wf-card:has(.wf-card-name:text-is('apw-switch-a')) button:text-is('打开')" }, timeout_ms: 5000 } }
+        label: switch_to_a
+      - do: { page: probe, action: wait, args: { ms: 1500 } }
+        label: switch_a_detail
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "wf5_switch_a_detail" } }
+        label: dom_switch_a_detail
+      # A 的运行视图：后台运行是否还在/已完成
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "div.wf-view-slot.is-active div.wf-subheader button.btn-primary:text-is('运行')" }, timeout_ms: 5000 } }
+        label: switch_a_run_view
+      - do: { page: probe, action: wait, args: { ms: 1500 } }
+        label: switch_a_run_state
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "wf5_switch_a_run" } }
+        label: dom_switch_a_run
+      # ---- 切到 B：核对身份 ----
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "div.wf-view-slot.is-active button:text-is('← 返回')" }, timeout_ms: 5000 } }
+        label: back_a_to_detail_2
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "div.wf-view-slot.is-active button:text-is('← 返回')" }, timeout_ms: 5000 } }
+        label: back_a_to_list_2
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "li.wf-card:has(.wf-card-name:text-is('apw-switch-b')) button:text-is('打开')" }, timeout_ms: 5000 } }
+        label: switch_to_b
+      - do: { page: probe, action: wait, args: { ms: 1500 } }
+        label: switch_b_detail
+        capture: true
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "div.wf-view-slot.is-active div.wf-subheader button.btn-primary:text-is('运行')" }, timeout_ms: 5000 } }
+        label: switch_b_run_view
+      - do: { page: probe, action: wait, args: { ms: 1500 } }
+        label: switch_b_run_state
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "wf5_switch_b_run" } }
+        label: dom_switch_b_run
+    signals:
+      - name: running_badge
+        selector: { by: css, value: "section.wf-run-status span.wf-run-state.is-running" }
+      - name: completed_badge
+        selector: { by: css, value: "section.wf-run-status span.wf-run-state.is-completed" }
+      - name: cancel_run_button
+        selector: { by: text, value: 取消运行 }
+      - name: card_running_badge
+        selector: { by: css, value: "li.wf-card span.wf-run-state.is-running" }
+      - name: log_alpha
+        selector: { by: text, value: 甲甲甲步骤 }
+      - name: log_beta
+        selector: { by: text, value: 乙乙乙步骤 }
+      - name: run_done_line
+        selector: { by: text, value: 工作流完成, exact: false }

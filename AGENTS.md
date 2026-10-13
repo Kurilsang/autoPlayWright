@@ -24,6 +24,7 @@ Linux / 服务器（网页端）：
 ```bash
 bash setup_linux.sh --with-deps   # 一次性：venv + 依赖 + Playwright chromium（--with-deps 装系统库，需 root）
 bash run_flows.sh                 # 无头跑业务链路（--debug=窗口可见+慢动作；其余参数透传 pytest）
+bash run_scheduler.sh             # 定时执行：默认 30 分钟一轮（--once 单跑；-- 后透传 pytest 参数）
 APW_CHROMIUM_ARGS="--no-sandbox --disable-dev-shm-usage" bash run_flows.sh   # 容器 root 跑 Chromium 必加
 ```
 
@@ -98,6 +99,7 @@ Python 3.11+ / Playwright（同步 API）/ pytest 9（pytest11 插件入口）/ 
 - 已知产品缺陷（桌面客户端 AI 编写，2026-10-12 实测）：助手消息轮偶发**空壳渲染**——竞态窗口≈生成完成边界附近打开面板，Thought/工具卡/正文全缺（零高度空 div），脚本却照常落盘解析、状态点 `is-done`；判 fail 冻结取证（`_assistant_turn_ready` 空壳不算渲染完整，同型时序不必然复现），待产品侧修复
 - 已知产品缺陷观察（桌面客户端）：纯寒暄偶发走 ~2s 无思考快速路径，回复整条缺 Thought 块（2026-10-08 实测 8 轮中 2 轮，判 fail 取证见 reports/20261008-110107、reports/20261008-112123）；对话用例一律用**推理型消息**保证思考块渲染，该不一致待产品侧确认
 - Linux 网页端可跑（2026-10-12）：`DriverConfig.args` + `APW_CHROMIUM_ARGS` 环境变量追加（容器 root 跑 `--no-sandbox`）+ 运行时路径锚定仓库根（`pytest_plugin.get_runtime` 不再吃 CWD）+ `setup_linux.sh`/`run_flows.sh`；桌面端链路仍需 Windows 客户端
+- 定时执行模块已交付（2026-10-13）：`python -m apw.scheduler`（+`run_scheduler.sh`）固定节奏循环跑 pytest（默认 30 分钟一轮，测试阶段口径），常驻/cron（`--once`）两用，超长跑跳槽不叠跑、每轮日志落 `reports/scheduler/`，SIGINT/SIGTERM 优雅停（含子进程终止）
 - 仓库与基建口径（2026-10-09）：DSL=编排层、判定语义在页面原语（宣传口径同步修正，D26）；等待/判定/取证收编 BasePage 基建（D27，SignalWatch 多信号收敛 + fail_evidence/fail_incomplete 统一取证，自测 `tests/test_signal_watch.py`）；示例链路移居 `examples/`（业务链路口径 = 16 条）；`video/`+`run_video.bat` 演示资产出库为本地（gitignored）
 - 测试基线：`pytest tests` 全绿（框架自测，含证据链路/失败取证/三态报告/脱敏用例/红线门禁）；工作流 4 条链路 + 对话并行切换 + Skills 广场 + 套组广场 + 报告样式库 2 条 + 操练场真实环境 3 次绿跑 + 桌面端对话冒烟真实客户端 3 次绿跑 + 桌面端工作流 4 条链路（打开运行/并行切换/AI 编写/AI 编写并行）真实客户端 3 次绿跑
 - 评审修复批次 P0 已交付（`.scratch/review-p0/`，6 票全 done）：prepare 失败与空步骤终态留痕、报告三态 + 跳过原因、run 目录唯一化 + 汇总合并、快照脱敏管道、定位器计数与解析同链

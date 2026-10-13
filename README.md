@@ -101,6 +101,48 @@ pytest flows --apw-env test --apw-headed --apw-slowmo 250
 python -m apw.crawler --env test --config configs/crawl/aml_chat.yaml
 ```
 
+## 定时执行（测试阶段默认 30 分钟一轮）
+
+调度器 `python -m apw.scheduler`（Linux 用 `run_scheduler.sh` 等价包装），两种部署形态：
+
+```bash
+bash run_scheduler.sh                      # 常驻：每 30 分钟跑 flows --apw-env test
+bash run_scheduler.sh --interval-minutes 60  # 调整间隔
+bash run_scheduler.sh --once               # 单跑一轮就退出（cron / 联调）
+bash run_scheduler.sh -- --apw-env fixture   # `--` 后透传 pytest 参数（替换默认）
+# Windows：.venv\Scripts\python -m apw.scheduler（同一模块）
+```
+
+- 固定节奏排期：一轮超时不叠跑、不补跑错过的槽位；每轮输出落 `reports/scheduler/run-<ts>.log`，
+  测试报告照常落 `reports/<run_id>/`；Ctrl+C / SIGTERM 优雅停（当前轮子进程一并终止）
+- **systemd 常驻**（推荐服务器用法）：
+
+  ```ini
+  # /etc/systemd/system/apw-scheduler.service
+  [Unit]
+  Description=apw 定时执行
+  After=network-online.target
+
+  [Service]
+  WorkingDirectory=/opt/autoPlayWright
+  Environment=PYTHONIOENCODING=utf-8
+  ExecStart=/opt/autoPlayWright/.venv/bin/python -m apw.scheduler --root /opt/autoPlayWright
+  Restart=always
+
+  [Install]
+  WantedBy=multi-user.target
+  ```
+
+  ```bash
+  systemctl enable --now apw-scheduler
+  ```
+
+- **crontab 备选**（注意单轮 > 间隔分钟数时会叠跑，此时改用常驻）：
+
+  ```cron
+  */30 * * * * cd /opt/autoPlayWright && .venv/bin/python -m apw.scheduler --once >> reports/scheduler/cron.log 2>&1
+  ```
+
 ## 当前留空（接缝已就位，等输入）
 
 - **Electron launch**：`driver.mode=electron` 当前仅支持 CDP attach

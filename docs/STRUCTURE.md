@@ -22,6 +22,7 @@ autoPlayWright/
 ├─ run_slides.bat          打开 docs/banner-light.html 项目报告页
 ├─ setup_linux.sh          Linux 一次性安装：venv + 依赖 + Playwright chromium（--with-deps 装系统库）
 ├─ run_flows.sh            Linux/服务器跑网页端链路：默认无头，--debug 转调试模式，透传 pytest 参数
+├─ run_scheduler.sh        Linux 定时执行守护：默认 30 分钟一轮（--once 单跑，-- 后透传 pytest 参数）
 ├─ pyproject.toml          包定义 + pytest11 插件入口
 ├─ README.md               使用入口（安装、配置、常用命令）
 └─ AGENTS.md               Agent 规则：硬约束、新页面五步走、已知产品行为/缺陷
@@ -38,6 +39,7 @@ autoPlayWright/
 | `config.py` | 环境配置加载（`configs/envs/<env>.yaml`） |
 | `sanitize.py` | 脱敏：敏感串→占位符，快照/探查产物落盘前自动执行 |
 | `pytest_plugin.py` | pytest11 插件：收集 flows、`--apw-*` 选项、跳过留痕、报告接线 |
+| `scheduler.py` | 定时执行调度（`python -m apw.scheduler`）：固定节奏循环跑 pytest，常驻/cron 两用 |
 | `dsl/` | flow schema（meta/steps：do·assert·judge）与加载校验 |
 | `engine/` | FlowRunner、StepEvent、页面动作注册表（`registry.py`） |
 | `pages/` | 页面对象：动作 = 语义原语（链路级完成判定 + 失败取证） |
@@ -76,6 +78,7 @@ autoPlayWright/
 | `scripts/snapshot_summary.py` | 快照摘要（结构核对） |
 | `tests/fixture_site/` | 本地夹具站点（框架自测 + 示例链路的被测对象） |
 | `reports/<run_id>/` | `<flow_id>.json` + `run-summary.json` + `report.html`（run_id = 时间戳+熵后缀） |
+| `reports/scheduler/run-<ts>.log` | 定时执行每轮日志（scheduler 产物，gitignored） |
 | `.scratch/autoPlayWright/issues/` | 主线任务票 01~08（依赖序） |
 | `.scratch/review-p0/` | 评审修复批（spec + 票 + P1/P2 backlog） |
 | `.scratch/autoPlayWright/snapshots/` | 页面快照产物（JSON/HTML/PNG/TXT 均不入库） |

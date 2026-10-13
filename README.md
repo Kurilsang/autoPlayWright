@@ -29,18 +29,101 @@ Linux / 服务器（网页端）：`bash setup_linux.sh --with-deps` 一键装�
 `bash run_flows.sh` 无头跑业务链路（`--debug` 转窗口可见 + 慢动作，其余参数透传 pytest）。
 容器以 root 跑 Chromium 需加启动参数：`APW_CHROMIUM_ARGS="--no-sandbox --disable-dev-shm-usage" bash run_flows.sh`。
 
-## 环境配置（跑非 fixture 环境前）
+## 启动方式（全部入口）
 
-- **fixture（默认）**：零配置，`pytest flows` 走本地夹具站点。
-- **test（真实测试环境）**：复制 `configs/envs/test.example.yaml` → `configs/envs/test.yaml`
-  填内网地址（gitignored，真实值不入库）；登录凭据放 `configs/secrets.local.yaml`
-  （`username`/`password`，gitignored）或 CI 环境变量 `APW_USERNAME`/`APW_PASSWORD`。
-  登录成功后 `configs/auth-state.json` 回写会话，后续运行免登录。
-- **desktop（Electron 客户端）**：复制 `configs/desktop.local.example.bat` → `configs/desktop.local.bat`
-  填客户端路径（或先 `set APW_DESKTOP_EXE=...`）；客户端需带 `--remote-debugging-port=9333` 启动，
-  `run_full_debug.bat` 会自动拉起并等 CDP 就绪。
-- **脱敏映射**：复制 `configs/sanitize.example.yaml` → `configs/sanitize.local.yaml`
-  （快照/探查产物落盘前自动脱敏，映射真实串仅存本地）。
+**Windows（开发机）**
+
+| 入口 | 用途 |
+|------|------|
+| `run_debug.bat` | 一键调试：`pytest flows --apw-env test --apw-headed --apw-slowmo 250`，额外参数透传 pytest（如 `-k smoke`、`--apw-env fixture`） |
+| `run_full_debug.bat` | 全量调试跑全部用例（P1 框架自测 → P2 登录冒烟 → P3 夹具样例 → P4 网页端链路 → P5 桌面端链路）；桌面端自动带 `--remote-debugging-port=9333` 拉起客户端并等 CDP 就绪；`APW_SLOWMO` 调慢动作 |
+| `run_slides.bat` | 打开 `docs/banner-light.html` 项目报告页 |
+| `run_video.bat` | Remotion 演示动画出片（`video/` 本地资产，gitignored，可选） |
+| `.venv\Scripts\pytest ...` | 直接调 pytest（配方见「常用命令」） |
+
+**Linux / 服务器（网页端）**
+
+| 入口 | 用途 |
+|------|------|
+| `bash setup_linux.sh` | 一次性安装：venv + pip 依赖 + Playwright chromium；`--with-deps` 另装 Chromium 系统库（需 root） |
+| `bash run_flows.sh` | 无头跑业务链路（默认 `flows --apw-env test`）；`--debug` 转窗口可见 + 250ms 慢动作；`--debug`/`--apw-env` 之外参数透传 pytest |
+| `bash run_scheduler.sh` | 定时执行常驻（默认 30 分钟一轮）；`--once` 单跑一轮退出；`--` 后透传 pytest 参数（见「定时执行」） |
+
+**模块入口（跨平台，Python 直调）**
+
+| 入口 | 用途 |
+|------|------|
+| `python -m apw.scheduler` | 定时调度内核（`run_scheduler.sh` 即其包装；Windows 定时用它） |
+| `python -m apw.crawler` | 页面状态快照（AI 生成事实依据 / 改版 diff 基线；`--env`/`--config` 见「常用命令」） |
+| `python -m apw.reporter.html_report reports/<run_id>` | HTML 报告重渲染（会话结束已自动渲染一次） |
+
+## 配置
+
+### 配置文件（configs/）
+
+| 文件 | 入库 | 说明 |
+|------|------|------|
+| `configs/envs/fixture.yaml` | 是 | fixture 本地夹具站点，零配置开箱即用 |
+| `configs/envs/test.example.yaml` → `test.yaml` | 模板入库，真实配置 gitignored | 真实测试环境（地址/登录选择器），真实值仅存本地/服务器 |
+| `configs/envs/desktop.yaml` | 是 | 桌面端环境（CDP attach 端点） |
+| `configs/secrets.local.yaml` | 否 | 登录凭据 `username`/`password`（或环境变量 `APW_USERNAME`/`APW_PASSWORD`，见下） |
+| `configs/sanitize.example.yaml` → `sanitize.local.yaml` | 模板入库 | 脱敏映射（敏感串→占位符，快照/探查产物落盘前自动执行） |
+| `configs/desktop.local.example.bat` → `desktop.local.bat` | 模板入库 | 桌面客户端 exe 路径（`APW_DESKTOP_EXE`） |
+| `configs/auth-state.json` | 否 | 登录态回写（首次表单登录成功后生成，后续运行免登录） |
+| `configs/crawl/*.yaml` | 是 | 爬取/探查配置（状态路径 + 完成信号探针） |
+
+### 环境配置字段（configs/envs/<env>.yaml）
+
+```yaml
+base_url: ""            # http(s)://、file:// 或相对仓库根路径；desktop 留空 = 不导航（客户端启动即其 UI）
+driver:
+  mode: web             # web | electron
+  channel: ""           # 如 "msedge" 用系统浏览器；空 = Playwright 内置 chromium
+  headless: true        # --apw-headed 可覆盖
+  slow_mo: 0            # 动作间隔 ms；--apw-slowmo 可覆盖
+  args: []              # chromium 启动参数（Linux 容器 root 需 --no-sandbox）；APW_CHROMIUM_ARGS 可追加
+  electron:
+    cdp_endpoint: ""    # CDP attach 端点（如 http://127.0.0.1:9333）；APW_CDP_ENDPOINT 可覆盖
+auth:
+  type: none            # none（夹具免登录）| storage_state | form（表单登录）
+  login_url: ""         # form：登录页地址
+  login_path_hint: /login  # URL 含此片段视为未登录
+  username_selector: "#username"
+  password_selector: "#password"
+  submit_selector: 'button[type="submit"]'
+  username: ""          # 不推荐入库；解析顺序：显式配置 → 环境变量 → secrets_file
+  password: ""
+  secrets_file: ""      # 如 configs/secrets.local.yaml
+  state_file: ""        # 登录态回写路径（如 configs/auth-state.json），登录成功后生成
+```
+
+### 环境变量（服务器/CI 推荐，不落盘）
+
+| 变量 | 作用 |
+|------|------|
+| `APW_USERNAME` / `APW_PASSWORD` | form 登录凭据（优先于 `secrets.local.yaml`） |
+| `APW_CHROMIUM_ARGS` | 追加 chromium 启动参数（shell 风格分词）；容器 root 必加 `"--no-sandbox --disable-dev-shm-usage"` |
+| `APW_CDP_ENDPOINT` | 覆盖桌面端 `cdp_endpoint`（默认调试端口被占时换端口） |
+| `APW_DESKTOP_EXE` | 桌面客户端 exe 路径（`run_full_debug.bat` 拉起用，优先于 `desktop.local.bat`） |
+| `APW_SLOWMO` | `run_full_debug.bat` 慢动作毫秒数（默认 250） |
+| `PYTHON` | `setup_linux.sh` 指定 Python 解释器（如 `PYTHON=python3.12`） |
+| `PYTHONIOENCODING` | 控制台/子进程输出编码（各脚本内已默认 utf-8） |
+
+### 命令行选项
+
+pytest 插件（`--apw-*`）：
+
+| 选项 | 默认 | 说明 |
+|------|------|------|
+| `--apw-env` | `fixture` | 执行环境名 → `configs/envs/<env>.yaml` |
+| `--apw-flows-dir` | `flows` | 链路目录（相对仓库根；`examples` 可跑 DSL 示例） |
+| `--apw-reports-dir` | `reports` | 报告输出目录（相对仓库根） |
+| `--apw-headed` | 关 | 浏览器窗口可见（覆盖 `headless: true`） |
+| `--apw-slowmo` | `0` | 每个动作间延迟 ms（配合 `--apw-headed` 调试） |
+
+pytest 原生照常可用：`-k` 关键词、`-m` marker 筛选、`--alluredir` Allure 结果目录等。
+
+调度器选项（`python -m apw.scheduler`）见「定时执行」。
 
 ## 一条链路 = 一个 YAML（编排）
 

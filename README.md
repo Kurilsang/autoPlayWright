@@ -198,7 +198,7 @@ bash run_scheduler.sh -- --apw-env fixture   # `--` 后透传 pytest 参数（�
 
 - 固定节奏排期：一轮超时不叠跑、不补跑错过的槽位；每轮输出落 `reports/scheduler/run-<ts>.log`，
   测试报告照常落 `reports/<run_id>/`；Ctrl+C / SIGTERM 优雅停（当前轮子进程一并终止）
-- **systemd 常驻**（推荐服务器用法）：
+- **systemd 常驻**（推荐服务器用法；路径填实际部署目录）：
 
   ```ini
   # /etc/systemd/system/apw-scheduler.service
@@ -207,9 +207,9 @@ bash run_scheduler.sh -- --apw-env fixture   # `--` 后透传 pytest 参数（�
   After=network-online.target
 
   [Service]
-  WorkingDirectory=/opt/autoPlayWright
+  WorkingDirectory=<部署目录>
   Environment=PYTHONIOENCODING=utf-8
-  ExecStart=/opt/autoPlayWright/.venv/bin/python -m apw.scheduler --root /opt/autoPlayWright
+  ExecStart=<部署目录>/.venv/bin/python -m apw.scheduler --root <部署目录>
   Restart=always
 
   [Install]
@@ -223,8 +223,52 @@ bash run_scheduler.sh -- --apw-env fixture   # `--` 后透传 pytest 参数（�
 - **crontab 备选**（注意单轮 > 间隔分钟数时会叠跑，此时改用常驻）：
 
   ```cron
-  */30 * * * * cd /opt/autoPlayWright && .venv/bin/python -m apw.scheduler --once >> reports/scheduler/cron.log 2>&1
+  */30 * * * * cd <部署目录> && .venv/bin/python -m apw.scheduler --once >> reports/scheduler/cron.log 2>&1
   ```
+
+- 部署（打包 → 上传 → 服务器解压）见 [`docs/DEPLOY.md`](docs/DEPLOY.md)。
+
+## 回归触发 API（外部服务触发跑测、取报告包）
+
+给**外部服务**用的接口：它定时触发回归 → 拿到 zip 产物 → 用它自己的邮件通道外发。
+这样发信能力与测试侧解耦，本项目只需能跑测试、能产出报告（跨平台，Linux 无邮件通道也能跑）。
+完整契约见 [`docs/API.md`](docs/API.md)。
+
+```bash
+# 启动（Linux；默认端口 18787）
+bash run_api.sh                                       # 本机自测（只绑 127.0.0.1）
+nohup bash run_api.sh --host 0.0.0.0 --port 18787 > reports/api.log 2>&1 &   # 跨机（须配 token）
+
+# Windows
+.venv\Scripts\python -m apw.api --port 18787
+```
+
+| 方法 | 路径 | 作用 |
+|---|---|---|
+| `POST` | `/runs` | 触发一轮（异步，返回 `run_id` / `status_url` / `report_zip`） |
+| `GET` | `/runs/<run_id>` | 查状态与摘要（`summary` / `flows` / `failed_flows`） |
+| `GET` | `/runs/<run_id>/report.zip` | 下载产物包（`report.html` + JSON + 失败冻结截图，可直接当邮件附件） |
+| `GET` | `/runs` | 最近 20 轮（对账/补拉） |
+| `GET` | `/health` | 存活探针（免鉴权） |
+
+```bash
+TOKEN=<token>   # configs/secrets.local.yaml 的 api.token，或 APW_API_TOKEN 环境变量
+curl -X POST http://<服务器IP>:18787/runs \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"env":"test","callback_url":"https://mail-svc/hook"}'
+curl -H "Authorization: Bearer $TOKEN" -o report.zip \
+  http://<服务器IP>:18787/runs/<run_id>/report.zip
+```
+
+- 鉴权：除 `/health` 外都要 `Authorization: Bearer <token>`；token 解析顺序
+  `--token` → `APW_API_TOKEN` → `configs/secrets.local.yaml` 的 `api.token`；
+  生成：`python -m apw.api --gen-token`
+- 安全兜底：未配 token 时只允许绑 `127.0.0.1`；绑 `0.0.0.0` 且无 token **拒绝启动**
+- 单飞队列：同时只跑一轮，其余排队（避免叠加触发撞后端 LLM 限流）
+- 完成回调：跑完 `POST callback_url`（带 `summary` / `failed_flows` / `report_zip` / `stdout_tail`），
+  失败不影响本轮结果，可补拉 `GET /runs/<id>`
+- 启动失败排查与连通性诊断（`Errno 98` 端口占用 / `Errno 111` 未监听 / `Errno 113` 网络不通）
+  见 [`docs/API.md`](docs/API.md) 的「启动」与「连通性排查」两节
 
 ## 当前留空（接缝已就位，等输入）
 

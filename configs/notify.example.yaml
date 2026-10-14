@@ -1,0 +1,24 @@
+# 通知邮件 SMTP 配置模板。
+# 真实值只写入 configs/secrets.local.yaml（gitignored）或 CI 环境变量，
+# 本文件仅占位符（AGENTS 红线：内网域名/账号/个人信息不入库）。
+# 环境变量覆盖：APW_SMTP_HOST / APW_SMTP_PORT / APW_SMTP_SECURITY /
+#   APW_SMTP_USER / APW_SMTP_PASSWORD / APW_NOTIFY_FROM / APW_NOTIFY_TO
+smtp:
+  host: smtp.example.com
+  port: 587
+  security: starttls        # starttls | ssl | none
+  auth: basic               # basic | xoauth2（MFA 租户禁基本认证，用 xoauth2 + --login）
+  transport: smtp           # smtp | ews | foxmail（foxmail=本机客户端代发，免微软登录）
+  timeout: 30
+  username: <user>@<domain>
+  password: <password>      # basic 用；xoauth2 用 token 缓存（--login 获取）
+  from: <user>@<domain>     # 发件身份（缺省取 username）
+  client_id: <oauth-client-id>  # xoauth2 可选（缺省公共客户端，可换自注册应用）
+  to:                       # 默认收件人（可被 --to / APW_NOTIFY_TO 覆盖）
+    - <user>@<domain>
+
+# 回归触发 API 的 Bearer token（同一 secrets 文件，同口径：真实值只存本地）。
+# 生成：python -m apw.api --gen-token
+# 优先级：--token > 环境变量 APW_API_TOKEN > 本段。
+api:
+  token: <api-token>

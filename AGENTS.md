@@ -15,9 +15,18 @@ python -m venv .venv
 .venv\Scripts\pytest flows --apw-headed --apw-slowmo 250  # 调试：窗口可见 + 放慢动作
 .\run_debug.bat                                          # 同上一键调试（可透传 pytest 参数）
 .venv\Scripts\python -m apw.crawler --env test --config configs/crawl/aml_chat.yaml   # 页面状态快照（票 06）
+$env:APW_API_TOKEN='xxx'; .venv\Scripts\python -m apw.api --port 18787   # 回归触发 API（外部服务触发+取 zip 产物）
 .venv\Scripts\pytest flows/desktop_chat_smoke.yaml --apw-env desktop  # 桌面端（客户端先带 --remote-debugging-port=9333 启动；端口被占可 set APW_CDP_ENDPOINT=http://127.0.0.1:<port>）
 .venv\Scripts\ruff check src tests  # lint（提交前必须过）
 ```
+
+部署到服务器（部署规范见 `docs/DEPLOY.md`；**每次部署都要把命令给用户**）：
+
+```powershell
+.venv\Scripts\python scripts\pack_release.py --deploy      # 打包 + 部署（目标读 configs/deploy.local.yaml）
+```
+
+服务器上：`tar -xzf apw-deploy-<日期>.tar.gz` → `bash run_flows.sh`（真实路径见本地 `configs/deploy.local.yaml`）。
 
 Linux / 服务器（网页端）：
 
@@ -25,6 +34,7 @@ Linux / 服务器（网页端）：
 bash setup_linux.sh --with-deps   # 一次性：venv + 依赖 + Playwright chromium（--with-deps 装系统库，需 root）
 bash run_flows.sh                 # 无头跑业务链路（--debug=窗口可见+慢动作；其余参数透传 pytest）
 bash run_scheduler.sh             # 定时执行：默认 30 分钟一轮（--once 单跑；-- 后透传 pytest 参数）
+bash run_api.sh                   # 回归触发 API（跨机需 APW_API_TOKEN=xxx + --host 0.0.0.0）
 APW_CHROMIUM_ARGS="--no-sandbox --disable-dev-shm-usage" bash run_flows.sh   # 容器 root 跑 Chromium 必加
 ```
 
@@ -49,11 +59,11 @@ Python 3.11+ / Playwright（同步 API）/ pytest 9（pytest11 插件入口）/ 
 - `flows/*.yaml` — 业务链路用例（meta：platforms/envs/tags，steps：do·assert·judge，judge 为 v1 预留标记 planned）
 - `examples/` — DSL 示例（fixture 夹具站点演示 + 引擎端到端素材，不计业务链路；`pytest --apw-flows-dir examples examples` 可跑）
 - `locators/*.yaml` — 命名定位器仓库，候选优先级 testid > role+name > placeholder/label > text > css/xpath
-- `src/apw/` — 分层：dsl（schema 校验）→ engine（FlowRunner 产 StepEvent）→ pages → locators → driver（Web/Electron 统一输出 Page）→ reporter（JSON 第一公民）→ pytest_plugin；`apw.crawler` 生成侧快照爬虫（含 `page: probe` 探查原语）
+- `src/apw/` — 分层：dsl（schema 校验）→ engine（FlowRunner 产 StepEvent）→ pages → locators → driver（Web/Electron 统一输出 Page）→ reporter（JSON 第一公民）→ pytest_plugin；`apw.crawler` 生成侧快照爬虫（含 `page: probe` 探查原语）；`apw.notify` 通知邮件（下游消费者，`python -m apw.notify --test/--summary`，pytest 侧 `APW_NOTIFY=always|on-fail` 门控默认关闭；三通道 smtp/ews/foxmail，凭据只存 `configs/secrets.local.yaml`，模板 `configs/notify.example.yaml`）；`apw.api` 回归触发 API（下游消费者，`python -m apw.api`／`run_api.sh`，契约见 `docs/API.md`：POST /runs 触发 + GET /runs/<id> 查状态 + GET /runs/<id>/report.zip 取产物包 + 完成回调，单飞队列、Bearer 鉴权、默认仅绑本机）
 - `configs/envs/*.yaml` — 环境配置（`--apw-env` 选择；fixture=本地夹具站点）
 - `configs/crawl/*.yaml` — 爬取配置（状态路径 + 完成信号探针，喂生成器）
 - `scripts/` — 生成侧工具脚本（快照摘要等，AI 复用）
-- `reports/` — 运行产物（gitignored；`report.html` 会话结束自动渲染）；`docs/SPEC.md` — 规格与决策记录；`docs/CASE_PROGRESS.md` — 用例清单与进度（新增/改动链路后同步）；`docs/STRUCTURE.md` — 目录结构；`docs/banner-light.html` — 项目报告页（banner 轮播，`run_slides.bat` 打开）；`video/`+`run_video.bat` — Remotion 汇报动画本地资产（gitignored 不入库）
+- `reports/` — 运行产物（gitignored；`report.html` 会话结束自动渲染）；`docs/SPEC.md` — 规格与决策记录；`docs/CASE_PROGRESS.md` — 用例清单与进度（新增/改动链路后同步）；`docs/STRUCTURE.md` — 目录结构；`docs/DEPLOY.md` — **部署规范（唯一权威）**；`docs/banner-light.html` — 项目报告页（banner 轮播，`run_slides.bat` 打开）；`video/`+`run_video.bat` — Remotion 汇报动画本地资产（gitignored 不入库）
 - `.scratch/autoPlayWright/issues/` — 主建任务票（01~08，依赖序）；`.scratch/review-p0/` — 评审修复批（spec + 票 + P1/P2 backlog）；完成即勾验收框并标 done
 - commit 格式：`feat/fix: 一句话` + `- 要点`，极简
 
@@ -92,6 +102,7 @@ Python 3.11+ / Playwright（同步 API）/ pytest 9（pytest11 插件入口）/ 
 - 已知产品行为：报告样式库（侧边栏「更多场景」→ 场景卡）8 类 28 套样式；卡片「预览/做同款」开同一弹层（头部：做同款/新标签打开/关闭），弹层「做同款」=一键复制官方示例工作流跳转 `/workflows/<uuid>`（副本名含「官方模板」「(Fork)」；实测同页跳转，页面对象兼容弹窗形态）；运行面板参数默认预填，**recipients 留空=不发邮件（用例绝不填）**；「工作流产物」区「· 产物」行 = 工作区最终结果
 - 已知框架陷阱：Playwright 同步 API 纯 `time.sleep` 轮询不泵事件循环，`page.url` 会停在旧值（做同款跳转等待曾误判未跳转）——轮询一律走 API 调用（`wait_for_timeout`/`count`/`inner_text`）
 - 已知框架陷阱：定位器裸 text 候选（`exact: true`）会错配同名结构——工作流面板开着时 `<h2>工作流</h2>` 抢在侧边栏按钮前命中（2026-10-12 实测）；结构候选（css）必须排在裸 text 候选前
+- 已知框架陷阱（Foxmail 代发通道，2026-10-14 实测）：Foxmail=Delphi 程序 UIA 全盲，发信=mailto 拉写信窗 + 前台 Ctrl+Enter；①窗口句柄会被 Windows 复用，新旧写信窗辨别必须 `{hwnd: 标题}` 映射比标题（裸句柄集合会把新窗当旧窗屏蔽）；②前台锁下 AttachThreadInput+SetForegroundWindow 无效，有效序列=SW_RESTORE→空敲 ALT→SetForegroundWindow 循环重试；③窗太新就发键会被吞（等 TCEFWindowParent 子窗出现）；④新邮件弹窗（TMailViewerForm）会瞬时偷焦点，每轮键击前重验前台（`APW_NOTIFY_DEBUG=1` 留证）
 - 已知产品行为：操练场（更多场景→「创作与调试」组）= 套组调试沙箱，会话卡绑一个套组；「新建会话」弹窗（会话名称 + 原生 select 从套组加载）确定后**直接进 IDE**（列表恢复才走「进入调试」）；IDE 两种模式=Agent 助手（读写工作区文件）/▶测试套组（输入用户消息 Enter 运行一次完整推理）；运行日志=「▶ 操练场运行开始」→「Prompt: 回显」→「│」输出行→「✅ 运行完成，用时 Ns，Token: N」，顶栏状态 空闲→已完成
 - 已知产品行为（桌面客户端）：组合器为 contenteditable 富输入（Enter 发送/Shift+Enter 换行，同工作流编辑器陷阱一律真实键入）；生成中发送键变「停止生成」（`button.btn-send.btn-stop`）= 流式信号；Thought 折叠块（`details.msg-thinking`）**正文展开才渲染**（折叠态仅 summary，`expand_thinking` 测展开：summary 点击 → `details[open]` + `.msg-thinking-body`）；完成态=回答气泡 + 完成态操作行；「新任务」清空会话区（未清空判 fail）；无会话 URL，身份锚点=消息 `data-message-id`；会话标题异步生效（生成中带 `.is-generating`）
 - 已知产品行为（桌面客户端工作流）：工作流区是 **view slot 栈**（列表底座 + 详情/运行叠放，「← 返回」回上一槽：详情槽保活、运行槽销毁，同时仅一槽 `is-active`）；**运行后台执行、视图切走不中断**（卡片「进行中」角标 +「最近运行：运行中」）；脚本编辑器=CodeMirror（整体 insert_text，同逐键自动缩进陷阱），保存落定=「保存」按钮转 disabled，流程节点保存后解析；运行=详情「运行」开运行视图（运行输入/历史运行）→ 再点「运行」执行，完成行=「✅ 工作流完成。…」；身份锚点=详情标题 h3 / 运行视图标题 / 日志「工作流开始：<名>」行；常驻「服务连接异常」toast 会拦截下方点击（关闭钮是 `aria-label=关闭` 的图标钮，无文本，`dismiss_toasts` 幂等清）
@@ -100,6 +111,7 @@ Python 3.11+ / Playwright（同步 API）/ pytest 9（pytest11 插件入口）/ 
 - 已知产品缺陷观察（桌面客户端）：纯寒暄偶发走 ~2s 无思考快速路径，回复整条缺 Thought 块（2026-10-08 实测 8 轮中 2 轮，判 fail 取证见 reports/20261008-110107、reports/20261008-112123）；对话用例一律用**推理型消息**保证思考块渲染，该不一致待产品侧确认
 - Linux 网页端可跑（2026-10-12）：`DriverConfig.args` + `APW_CHROMIUM_ARGS` 环境变量追加（容器 root 跑 `--no-sandbox`）+ 运行时路径锚定仓库根（`pytest_plugin.get_runtime` 不再吃 CWD）+ `setup_linux.sh`/`run_flows.sh`；桌面端链路仍需 Windows 客户端
 - 定时执行模块已交付（2026-10-13）：`python -m apw.scheduler`（+`run_scheduler.sh`）固定节奏循环跑 pytest（默认 30 分钟一轮，测试阶段口径），常驻/cron（`--once`）两用，超长跑跳槽不叠跑、每轮日志落 `reports/scheduler/`，SIGINT/SIGTERM 优雅停（含子进程终止）
+- 回归触发 API 已交付（2026-10-14）：`src/apw/api.py`（+`run_api.sh`）供外部服务定时触发跑测、取 zip 产物、由其自建邮件通道外发——**发信能力与测试侧解耦，跨平台**（Linux 无邮件通道亦可跑）；单飞队列（同时只跑一轮，避免叠加触发 LLM 限流）、Bearer 鉴权（`APW_API_TOKEN`，非本机绑定强制要求）、默认只绑 127.0.0.1、完成回调（POST callback_url，失败不影响结果可补拉）、zip = run 目录全量（report.html + run-summary.json + 明细 JSON + 失败冻结截图）；`build_report_zip(sanitize=True)` 预留外发脱敏开关（复用 `apw.sanitize`，默认关=内网可信调用）；契约见 `docs/API.md`，自测 `tests/test_api.py`
 - 仓库与基建口径（2026-10-09）：DSL=编排层、判定语义在页面原语（宣传口径同步修正，D26）；等待/判定/取证收编 BasePage 基建（D27，SignalWatch 多信号收敛 + fail_evidence/fail_incomplete 统一取证，自测 `tests/test_signal_watch.py`）；示例链路移居 `examples/`（业务链路口径 = 16 条）；`video/`+`run_video.bat` 演示资产出库为本地（gitignored）
 - 测试基线：`pytest tests` 全绿（框架自测，含证据链路/失败取证/三态报告/脱敏用例/红线门禁）；工作流 4 条链路 + 对话并行切换 + Skills 广场 + 套组广场 + 报告样式库 2 条 + 操练场真实环境 3 次绿跑 + 桌面端对话冒烟真实客户端 3 次绿跑 + 桌面端工作流 4 条链路（打开运行/并行切换/AI 编写/AI 编写并行）真实客户端 3 次绿跑
 - 评审修复批次 P0 已交付（`.scratch/review-p0/`，6 票全 done）：prepare 失败与空步骤终态留痕、报告三态 + 跳过原因、run 目录唯一化 + 汇总合并、快照脱敏管道、定位器计数与解析同链

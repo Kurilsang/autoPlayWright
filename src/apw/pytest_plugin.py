@@ -5,6 +5,7 @@ flow 测试项与框架自测 fixtures 共用同一实例，session 结束统一
 """
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -133,6 +134,22 @@ def pytest_sessionfinish(session, exitstatus):
                 print(f"\n[apw] HTML 报告: {render_html(summary.parent)}")
             except Exception as exc:  # noqa: BLE001 - 渲染失败不影响测试结果
                 print(f"\n[apw] HTML 报告渲染失败: {exc}")
+            _maybe_notify(summary)
+
+
+def _maybe_notify(summary: Path) -> None:
+    """可选邮件通知：APW_NOTIFY=always|on-fail 才发（默认关闭），失败不影响测试结果。"""
+    policy = os.environ.get("APW_NOTIFY", "").strip().lower()
+    if policy not in ("always", "on-fail"):
+        return
+    try:
+        from apw.notify import notify_from_summary
+
+        sent = notify_from_summary(summary, policy=policy)
+        state = "已发送" if sent else f"未发送（policy={policy} 未命中）"
+        print(f"\n[apw] 通知邮件: {state}")
+    except Exception as exc:  # noqa: BLE001 - 通知失败不影响测试结果
+        print(f"\n[apw] 通知邮件发送失败: {exc}")
 
 
 # ---------- fixtures（框架自测与 flow 项共用运行时） ----------

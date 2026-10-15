@@ -10,7 +10,9 @@
     python -m apw.scheduler                        # 每 30 分钟跑 flows --apw-env test
     python -m apw.scheduler --interval-minutes 60  # 调整间隔
     python -m apw.scheduler --cron "0 21 * * *"    # 每天 21:00（cron 钟点锚定，常驻）
-    python -m apw.scheduler --cron "0 21 * * 1"    # 每周一 21:00（周频率）
+    python -m apw.scheduler --cron "0 18 * * 5"    # 每周五 18:00（周频率）
+    python -m apw.scheduler --cron "0 21 * * *" --cron "0 18 * * 5"   # 多条并集：+周五 18:00
+    python -m apw.scheduler --cron "0 21 * * 1"    # 每周一 21:00
     python -m apw.scheduler --cron "0 21 1 * *"    # 每月 1 日 21:00（月频率）
     python -m apw.scheduler --once                 # 只跑一轮（联调/冒烟；立即执行）
     python -m apw.scheduler -- --apw-env fixture   # `--` 后透传 pytest 参数（替换默认）
@@ -18,7 +20,8 @@
 cron 语义（标准 5 字段：分 时 日 月 周，周 0/7=周日）：支持 `*`、`n`、`a-b`、`*/s`、
 `a-b/s`、`n/s`、逗号列表、跨区间（如 `22-2`）；日与周同时限定时按经典语义取「或」。
 排期语义：`--interval-minutes` 首轮启动即跑、此后按间隔顺延（错过的槽位不补跑）；
-`--cron` 钟点锚定，首轮也等到下一个触发点才跑（不抢跑、跨天/月/年顺延）。两者互斥。
+`--cron` 钟点锚定（**可给多次 = 多档排期并集**），首轮也等到下一个触发点才跑（不抢跑）。
+`--cron` 与 `--interval-minutes` 互斥。
 """
 from __future__ import annotations
 
@@ -135,6 +138,11 @@ def _parse_field(text: str, lo: int, hi: int, name: str) -> frozenset[int]:
     return frozenset(values)
 
 
+def next_cron_slot(crons: list[CronExpr], now: datetime) -> datetime:
+    """多条 cron 表达式取并集：最近的未来触发点，由任意一条命中都算。"""
+    return min(cron.next_after(now) for cron in crons)
+
+
 def run_once(
     cmd: list[str],
     cwd: Path,
@@ -205,11 +213,13 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--cron",
-        default="",
+        action="append",
+        default=[],
         metavar="EXPR",
         help=(
             "cron 表达式钟点锚定（分 时 日 月 周）：如 '0 21 * * *' 每天 21:00、"
-            "'0 21 * * 1' 每周一、'0 21 1 * *' 每月 1 日；与 --interval-minutes 互斥"
+            "'0 18 * * 5' 每周五 18:00、'0 21 1 * *' 每月 1 日；"
+            "可给多次 = 多档排期并集；与 --interval-minutes 互斥"
         ),
     )
     parser.add_argument("--root", default=".", help="仓库根目录（pytest 在此目录下执行）")
@@ -220,14 +230,15 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(own)
 
-    cron: CronExpr | None = None
-    if args.cron.strip():
+    crons: list[CronExpr] = []
+    if args.cron:
         if any(a == "--interval-minutes" or a.startswith("--interval-minutes=") for a in own):
             parser.error("--cron 与 --interval-minutes 互斥：钟点锚定与固定间隔二选一")
-        try:
-            cron = CronExpr(args.cron.strip())
-        except ValueError as exc:
-            parser.error(str(exc))
+        for raw in args.cron:
+            try:
+                crons.append(CronExpr(raw.strip()))
+            except ValueError as exc:
+                parser.error(str(exc))
 
     pytest_args = rest or DEFAULT_PYTEST_ARGS
     root = Path(args.root).resolve()
@@ -239,11 +250,13 @@ def main(argv: list[str] | None = None) -> int:
         signal.signal(sig, lambda *_: stop.set())
 
     interval = timedelta(minutes=args.interval_minutes)
-    schedule = f"cron {cron.expr}" if cron is not None else f"每 {args.interval_minutes} 分钟一轮"
+    schedule = "cron " + " ∪ ".join(c.expr for c in crons) if crons else (
+        f"每 {args.interval_minutes} 分钟一轮"
+    )
     print(f"[scheduler] {schedule}：{' '.join(cmd)}（cwd={root}）", flush=True)
-    if cron is not None and not args.once:
+    if crons and not args.once:
         try:
-            slot = cron.next_after(datetime.now())
+            slot = next_cron_slot(crons, datetime.now())
         except ValueError as exc:  # 无解表达式（如 2 月 30 日）启动即报错，不留空转服务
             parser.error(str(exc))
         print(f"[scheduler] 首轮 {slot:%Y-%m-%d %H:%M}（cron 到点触发，不抢跑）", flush=True)
@@ -257,8 +270,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"[scheduler] 完成：退出码 {code}，用时 {duration}s，日志 {log_path}", flush=True)
         if args.once:
             return code
-        if cron is not None:
-            slot = cron.next_after(datetime.now())
+        if crons:
+            slot = next_cron_slot(crons, datetime.now())
         else:
             slot = next_slot(slot, interval, datetime.now())
         delay = max(0.0, (slot - datetime.now()).total_seconds())

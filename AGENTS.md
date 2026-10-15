@@ -36,7 +36,7 @@ Linux / 服务器（网页端）：
 bash setup_linux.sh --with-deps   # 一次性：venv + 依赖 + Playwright chromium（--with-deps 装系统库，需 root）
 bash run_flows.sh                 # 无头跑业务链路（--debug=窗口可见+慢动作；其余参数透传 pytest）
 bash run_and_mail.sh              # 一键：跑 flows + 发带附件的报告邮件（--no-mail 只跑）
-bash run_scheduler.sh             # 定时执行：--cron "0 21 * * *" 钟点锚定（周/月频率同理）；默认 30 分钟（--once 单跑；-- 后透传 pytest 参数）
+bash run_scheduler.sh             # 定时执行：--cron "0 21 * * *"（可给多次=并集，如 --cron "0 18 * * 5" 每周五 18:00）；默认 30 分钟（--once 单跑；-- 后透传 pytest 参数）
 bash run_api.sh                   # 回归触发 API（跨机需 APW_API_TOKEN=xxx + --host 0.0.0.0）
 APW_CHROMIUM_ARGS="--no-sandbox --disable-dev-shm-usage" bash run_flows.sh   # 容器 root 跑 Chromium 必加
 ```
@@ -114,7 +114,7 @@ Python 3.11+ / Playwright（同步 API）/ pytest 9（pytest11 插件入口）/ 
 - 已知产品缺陷（桌面客户端 AI 编写，2026-10-12 实测）：助手消息轮偶发**空壳渲染**——竞态窗口≈生成完成边界附近打开面板，Thought/工具卡/正文全缺（零高度空 div），脚本却照常落盘解析、状态点 `is-done`；判 fail 冻结取证（`_assistant_turn_ready` 空壳不算渲染完整，同型时序不必然复现），待产品侧修复
 - 已知产品缺陷观察（桌面客户端）：纯寒暄偶发走 ~2s 无思考快速路径，回复整条缺 Thought 块（2026-10-08 实测 8 轮中 2 轮，判 fail 取证见 reports/20261008-110107、reports/20261008-112123）；对话用例一律用**推理型消息**保证思考块渲染，该不一致待产品侧确认
 - Linux 网页端可跑（2026-10-12）：`DriverConfig.args` + `APW_CHROMIUM_ARGS` 环境变量追加（容器 root 跑 `--no-sandbox`）+ 运行时路径锚定仓库根（`pytest_plugin.get_runtime` 不再吃 CWD）+ `setup_linux.sh`/`run_flows.sh`；桌面端链路仍需 Windows 客户端
-- 定时执行模块已交付（2026-10-13）：`python -m apw.scheduler`（+`run_scheduler.sh`）固定节奏循环跑 pytest（默认 30 分钟一轮，测试阶段口径），常驻/cron（`--once`）两用，超长跑跳槽不叠跑、每轮日志落 `reports/scheduler/`，SIGINT/SIGTERM 优雅停（含子进程终止）；2026-10-15 增 `--cron`（标准 5 字段自包含解析，支持日/周/月频率，日与周同限取「或」，跨区间 `22-2`；与 `--interval-minutes` 互斥；`--once` 立即跑不受其影响；当前排期口径=每天 21:00）
+- 定时执行模块已交付（2026-10-13）：`python -m apw.scheduler`（+`run_scheduler.sh`）固定节奏循环跑 pytest（默认 30 分钟一轮，测试阶段口径），常驻/cron（`--once`）两用，超长跑跳槽不叠跑、每轮日志落 `reports/scheduler/`，SIGINT/SIGTERM 优雅停（含子进程终止）；2026-10-15 增 `--cron`（标准 5 字段自包含解析，支持日/周/月频率，日与周同限取「或」，跨区间 `22-2`；**可给多次=多档并集**；与 `--interval-minutes` 互斥；`--once` 立即跑不受其影响；当前排期口径=每天 21:00 + 每周五 18:00）
 - 回归触发 API 已交付（2026-10-14）：`src/apw/api.py`（+`run_api.sh`）供外部服务定时触发跑测、取 zip 产物、由其自建邮件通道外发——**发信能力与测试侧解耦，跨平台**（Linux 无邮件通道亦可跑）；单飞队列（同时只跑一轮，避免叠加触发 LLM 限流）、Bearer 鉴权（`APW_API_TOKEN`，非本机绑定强制要求）、默认只绑 127.0.0.1、完成回调（POST callback_url，失败不影响结果可补拉）、zip = run 目录全量（report.html + run-summary.json + 明细 JSON + 失败冻结截图）；`build_report_zip(sanitize=True)` 预留外发脱敏开关（复用 `apw.sanitize`，默认关=内网可信调用）；契约见 `docs/API.md`，自测 `tests/test_api.py`
 - 通知邮件模块增强（2026-10-14/15）：**收件人集中配置**（`configs/notify.local.yaml` 的 `notify:` 段，改名单不碰凭据；或 secrets 的 `smtp.to`/`report_to`/`cc`；`report_to` 非空整体取代 `to`，`cc` 只进 SMTP 信封不进 To 头）+ **邮件附件与回归触发 API 的 report.zip 同口径**（`apw.notify.mail.attach_run_zip` 直接调 `apw.api.build_report_zip`，外部服务 GET 到的包 = 邮件附件字节，同一函数一个产物；CLI `--report-zip` / `--zip-sanitize`，pytest 侧 `APW_NOTIFY_ATTACH=1` / `APW_NOTIFY_ZIP_SANITIZE=1`）+ `APW_NOTIFY=on-change` 策略（配 `APW_NOTIFY_PREV_FAILED` 基线）+ 摘要正文按 flow_id 稳定排序并单列失败清单；自测 `tests/test_notify.py`（含 attach 与 API zip 逐字节一致性断言）
 - 一键跑测+发报告已交付（2026-10-15）：`run_and_mail.bat`（Windows）/`run_and_mail.sh`（Linux）= 跑 `flows --apw-env <env>` → 定位本轮 run 目录（取**最新且含 run-summary.json** 的一份，免疫并发 writer 的中间态）→ `python -m apw.notify --report-zip` 发带附件摘要；`--no-mail` / `--env` / `--to` / `--cc` 自有开关，其余透传 pytest；跨平台等价物 `scripts/console_summary.py --targets flows --env test --mail`（额外做「附件 = API report.zip」逐字节核对，用于验收该不变量）。**只跑 flows**：`tests` 是夹具自测，与真实环境混跑必假红

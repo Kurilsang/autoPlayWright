@@ -3,7 +3,8 @@
 #
 #   bash run_scheduler.sh                          # 常驻：每 30 分钟 flows --apw-env test
 #   bash run_scheduler.sh --interval-minutes 60    # 调整间隔
-#   bash run_scheduler.sh --cron "0 21 * * *"      # cron 钟点锚定：每天 21:00（支持周/月频率）
+#   bash run_scheduler.sh --cron "0 21 * * *"      # cron 钟点锚定：每天 21:00（周/月频率同理）
+#   bash run_scheduler.sh --cron "0 21 * * *" --cron "0 18 * * 5"   # 多档并集：+每周五 18:00
 #   bash run_scheduler.sh --once                   # 单跑一轮就退出（联调/冒烟，立即执行）
 #   bash run_scheduler.sh -- --apw-env fixture     # `--` 后透传 pytest 参数（替换默认）
 #

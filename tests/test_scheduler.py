@@ -8,7 +8,14 @@ from pathlib import Path
 
 import pytest
 
-from apw.scheduler import DEFAULT_PYTEST_ARGS, CronExpr, build_command, next_slot, run_once
+from apw.scheduler import (
+    DEFAULT_PYTEST_ARGS,
+    CronExpr,
+    build_command,
+    next_cron_slot,
+    next_slot,
+    run_once,
+)
 
 
 class TestBuildCommand:
@@ -118,6 +125,20 @@ class TestCronExprNext:
     def test_no_trigger_in_five_years(self):
         with pytest.raises(ValueError):
             CronExpr("0 0 30 2 *").next_after(datetime(2026, 1, 1))
+
+
+class TestNextCronSlot:
+    """多档排期并集：任一表达式命中的最近未来触发点即排期点。"""
+
+    def test_union_picks_nearest(self):
+        # 每天 21:00 ∪ 每周五 18:00：周三 12:00 先到当天 21:00
+        crons = [CronExpr("0 21 * * *"), CronExpr("0 18 * * 5")]
+        assert next_cron_slot(crons, datetime(2026, 1, 7, 12, 0)) == datetime(2026, 1, 7, 21, 0)
+
+    def test_union_weekly_beats_daily(self):
+        # 周四 22:00：周五 18:00（周档）比周五 21:00（日档）先到
+        crons = [CronExpr("0 21 * * *"), CronExpr("0 18 * * 5")]
+        assert next_cron_slot(crons, datetime(2026, 1, 8, 22, 0)) == datetime(2026, 1, 9, 18, 0)
 
 
 class TestRunOnce:

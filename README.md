@@ -241,6 +241,8 @@ bash run_scheduler.sh                      # 常驻：每 30 分钟跑 flows --a
 APW_NOTIFY=always APW_NOTIFY_ATTACH=1 bash run_scheduler.sh   # 同上 + 每轮结束自动发完整报告邮件
 bash run_scheduler.sh --interval-minutes 60  # 调整间隔
 bash run_scheduler.sh --cron "0 21 * * *"    # 每天 21:00（cron 钟点锚定，首轮到点才跑）
+bash run_scheduler.sh --cron "0 18 * * 5"    # 每周五 18:00（周频率）
+bash run_scheduler.sh --cron "0 21 * * *" --cron "0 18 * * 5"   # 多档并集：每天 21:00 + 每周五 18:00
 bash run_scheduler.sh --cron "0 21 * * 1"    # 每周一 21:00（周频率）
 bash run_scheduler.sh --cron "0 21 1 * *"    # 每月 1 日 21:00（月频率）
 bash run_scheduler.sh --once               # 单跑一轮就退出（联调/冒烟；立即执行）
@@ -251,6 +253,7 @@ bash run_scheduler.sh -- --apw-env fixture   # `--` 后透传 pytest 参数（�
 
 `--cron` 为标准 5 字段（分 时 日 月 周，周 0/7=周日）：支持 `*`、`n`、`a-b`、`*/s`、
 `a-b/s`、`n/s`、逗号列表、跨区间（`22-2`）；日与周同时限定时取「或」（经典 cron 语义）。
+**`--cron` 可给多次 = 多档排期并集**（单服务承载，如每天 21:00 + 每周五 18:00）。
 `--cron` 与 `--interval-minutes` 互斥。
 
 - 固定节奏排期：一轮超时不叠跑、不补跑错过的槽位；每轮输出落 `reports/scheduler/run-<ts>.log`，

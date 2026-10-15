@@ -66,6 +66,8 @@ INCLUDE = [
     "AGENTS.md",
     "setup_linux.sh",
     "run_flows.sh",
+    "run_and_mail.sh",
+    "run_and_mail.bat",
     "run_scheduler.sh",
     "run_api.sh",
     "run_debug.bat",

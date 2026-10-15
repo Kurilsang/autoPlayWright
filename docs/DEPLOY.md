@@ -52,7 +52,9 @@ cp configs/notify.example.yaml configs/notify.local.yaml   # 只留 notify: 段�
 # 跑起来
 bash run_flows.sh
 bash run_and_mail.sh              # 一键：跑业务链路 + 发带附件的报告邮件
-bash run_scheduler.sh
+bash run_scheduler.sh             # 定时执行（默认 30 分钟一轮；纯跑测不发信）
+
+# 定时任务 + 自动发信、停止、冒烟（发信）的标准命令见下文「服务启停与冒烟」（每次部署交付必给）
 
 # 回归触发 API（外部服务调用；端口约定 18787）
 bash run_api.sh --host 0.0.0.0 --port 18787
@@ -137,6 +139,60 @@ smtp:
 APW_CHROMIUM_ARGS="--no-sandbox --disable-dev-shm-usage" bash run_flows.sh
 ```
 
+## 服务启停与冒烟（每次部署交付必给）
+
+> **交付口径**：每次部署完成后，必须把本节三组命令给到用户——**启动、停止、冒烟（必须能发信）**。
+> 本节是现役命令的唯一权威；README 同名内容只放简写与指针。以下均在部署目录下执行（Linux/服务器）。
+
+### 定时任务（scheduler）：启动 / 停止
+
+```bash
+# 启动（常驻，30 分钟一轮；每轮结束自动发完整报告邮件：正文 + report.zip 附件）
+APW_NOTIFY=always APW_NOTIFY_ATTACH=1 nohup bash run_scheduler.sh > reports/scheduler.log 2>&1 &
+
+# 停止（SIGTERM 优雅停：当前轮子进程一并终止，不留孤儿）
+pkill -f apw.scheduler
+pgrep -af apw.scheduler          # 无输出 = 已停
+tail -3 reports/scheduler.log    # 末行应为「[scheduler] 收到停止信号，退出」
+
+# 想要再起：重复上面的启动命令（nohup 幂等，先 pkill 确认没残留）
+```
+
+- 发信策略按需替换 `APW_NOTIFY=always|on-fail|on-change`（`on-change` 配 `APW_NOTIFY_PREV_FAILED` 基线）；
+  收件人只改 `configs/notify.local.yaml` 的 `notify.report_to`
+- **cron 形态**（`--once`）停止方式不同：kill 杀不掉 cron 的下一轮，须 `crontab -e` 注释该行：
+
+  ```cron
+  */30 * * * * cd <部署目录> && APW_NOTIFY=always APW_NOTIFY_ATTACH=1 .venv/bin/python -m apw.scheduler --once >> reports/scheduler/cron.log 2>&1
+  ```
+
+- systemd 形态：`systemctl stop apw-scheduler`（unit 示例见 README「定时执行」）
+
+### 回归触发 API：启动 / 停止
+
+```bash
+# 启动（后台常驻，端口约定 18787）
+nohup bash run_api.sh --host 0.0.0.0 --port 18787 > reports/api.log 2>&1 &
+curl http://127.0.0.1:18787/health        # {"status": "ok", ...} = 起来了
+
+# 停止
+pkill -f apw.api
+```
+
+### 冒烟测试（必须能发信）
+
+```bash
+# 发信链路冒烟：发一封真实测试邮件到配置收件人（收件箱可见 = SMTP + 名单 OK）
+.venv/bin/python -m apw.notify --test
+
+# 端到端冒烟（交付必给的那条）：跑一条冒烟用例 → 自动发完整报告邮件（正文 + report.zip 附件）
+APW_NOTIFY=always APW_NOTIFY_ATTACH=1 .venv/bin/python -m apw.scheduler --once -- flows/aml_chat_smoke.yaml --apw-env test
+```
+
+> 冒烟后应收到邮件：To = `configs/notify.local.yaml` 的 `notify.report_to`，
+> 附件 = 本轮 run 目录全量 zip（report.html + run-summary.json + 明细 JSON + 失败冻结截图）。
+> 收不到先按「发信通道怎么选」排查；起测报 `Executable doesn't exist` 先 `playwright install chromium`。
+
 ## 部署语义（重要）
 
 | 项 | 行为 |
@@ -168,3 +224,9 @@ user: "<部署机账号>"
 - 2026-10-15 四次调整：一键跑测+发报告脚本（`run_and_mail.sh`/`.bat`）；发信通道
   明确推荐「私人邮箱 SMTP + 授权码」（无需 M365 权限，可无人值守）；记录自建 SMTP/MX
   直投不可行的原因（出口 IP 无 PTR）
+- 2026-10-15 五次部署：定时执行 + 自动报告邮件上服务器（`APW_NOTIFY=always
+  APW_NOTIFY_ATTACH=1 bash run_scheduler.sh`，每轮结束发摘要 + 完整 report.zip 附件）；
+  收件人收敛为单人（`configs/notify.local.yaml` 只留 zepeng.huang）；`run_and_mail.sh`/`.bat`
+  补进打包白名单（此前漏打包）
+- 2026-10-15 六次调整：新增「服务启停与冒烟」一节并定为**交付必给**——每次部署给出
+  启动 / 停止 / 冒烟（发信）三组命令；启动、停止、`--test` 发信冒烟与端到端冒烟均已实测

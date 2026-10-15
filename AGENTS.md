@@ -22,7 +22,7 @@ $env:APW_API_TOKEN='xxx'; .venv\Scripts\python -m apw.api --port 18787   # 回�
 .venv\Scripts\ruff check src tests  # lint（提交前必须过）
 ```
 
-部署到服务器（部署规范见 `docs/DEPLOY.md`；**每次部署都要把命令给用户**）：
+部署到服务器（部署规范见 `docs/DEPLOY.md`；**每次部署都要把命令给用户，且必须含三件套：启动命令、停止命令、能发信的冒烟命令——标准命令唯一权威 = `docs/DEPLOY.md`「服务启停与冒烟」**）：
 
 ```powershell
 .venv\Scripts\python scripts\pack_release.py --deploy      # 打包 + 部署（目标读 configs/deploy.local.yaml）
@@ -119,10 +119,12 @@ Python 3.11+ / Playwright（同步 API）/ pytest 9（pytest11 插件入口）/ 
 - 通知邮件模块增强（2026-10-14/15）：**收件人集中配置**（`configs/notify.local.yaml` 的 `notify:` 段，改名单不碰凭据；或 secrets 的 `smtp.to`/`report_to`/`cc`；`report_to` 非空整体取代 `to`，`cc` 只进 SMTP 信封不进 To 头）+ **邮件附件与回归触发 API 的 report.zip 同口径**（`apw.notify.mail.attach_run_zip` 直接调 `apw.api.build_report_zip`，外部服务 GET 到的包 = 邮件附件字节，同一函数一个产物；CLI `--report-zip` / `--zip-sanitize`，pytest 侧 `APW_NOTIFY_ATTACH=1` / `APW_NOTIFY_ZIP_SANITIZE=1`）+ `APW_NOTIFY=on-change` 策略（配 `APW_NOTIFY_PREV_FAILED` 基线）+ 摘要正文按 flow_id 稳定排序并单列失败清单；自测 `tests/test_notify.py`（含 attach 与 API zip 逐字节一致性断言）
 - 一键跑测+发报告已交付（2026-10-15）：`run_and_mail.bat`（Windows）/`run_and_mail.sh`（Linux）= 跑 `flows --apw-env <env>` → 定位本轮 run 目录（取**最新且含 run-summary.json** 的一份，免疫并发 writer 的中间态）→ `python -m apw.notify --report-zip` 发带附件摘要；`--no-mail` / `--env` / `--to` / `--cc` 自有开关，其余透传 pytest；跨平台等价物 `scripts/console_summary.py --targets flows --env test --mail`（额外做「附件 = API report.zip」逐字节核对，用于验收该不变量）。**只跑 flows**：`tests` 是夹具自测，与真实环境混跑必假红
 - 发信通道现状（2026-10-15，**实发验证**）：本机改走**私人邮箱 SMTP + 授权码**（`smtp.qq.com:465` SSL + `auth: basic`），绕开微软 xoauth2 交互登录（无需 M365 任何权限）；已成功投递（私人邮箱 → 目标邮箱），带 2,152,044 字节附件，且**附件与 `apw.api` 的 report.zip 逐字节一致**。具体账号/授权码只在本地 `configs/secrets.local.yaml`。前提事实：目标邮箱域收信走 M365，**外部未认证直投（自建 SMTP/MX 直连）不可行**——本机出口 IP 无 PTR 反向解析，M365 会判 550/丢弃
+- 服务器部署现状（2026-10-15）：定时任务 + 每轮自动发信已部署服务器并实测发信成功（收件人只留 zepeng.huang，名单在服务器 `configs/notify.local.yaml`，SMTP 凭据并入服务器 `secrets.local.yaml` 且其 `api.token` 保留）；服务器起测前置 = `.venv/bin/playwright install chromium`（缺浏览器时 16 条全红，见下条连锁假错陷阱）
 - 本机全量跑测基线（2026-10-14，`tests + flows --apw-env test` 混跑，**跑法有误**，仅存档）：`19 failed, 136 passed, 5 skipped`。其中框架自测 14 条假红（`--apw-env test` 下夹具站点未起）+ 门禁 1 条（已于 2026-10-15 修复）；业务链路 4 failed / 7 passed / 5 skipped（skip=desktop 在 web 环境留痕）。**正确跑法**见下条「tests 与 flows 必须分开跑」——分开后 `pytest tests` 全绿。4 条业务失败均带完整取证：`aml-chat-smoke`（`reply_incomplete`，缺 reasoning_steps/final_answer_card/reply_actions）、`playground-suite-debug` 与 `suite-plaza-create`（`run_incomplete` 私有套组命中公开列表）、`skill-market-upload-download`（`run_stuck` 3 次下载无 2xx）
 - 门禁缺陷已修（`tests/test_no_secrets.py`，2026-10-15）：此前恒误报 5 条（改动前即失败），噪音会把真违规淹掉。两处根因：①`_SELF` 只跳过自身、没跳过 `scripts/redline_check.py`——该脚本是扫描规则的**载体**，正文必然含产品名模式串；②「凭据值」正则命中**赋值语句**而非配置值（`token = oauth.get_token(cfg)` 之类）。已修：跳过两个规则载体文件 + 「凭据值」只匹配配置取值语境并排除函数调用/占位符/变量引用。修后 `pytest tests` 全绿，且反向验证过仍能抓到硬编码 token/密码/内网 IP/产品名
 - 已知框架陷阱（本机跑全量的正确姿势，2026-10-14）：`tests` 与 `flows` 必须**分开跑或按环境跑**——夹具类自测（`test_crawler_fixture_site`/`test_engine_fixture_site`/`test_probe_page`/`test_crawler_schema`）走 `--apw-env fixture` 的本地夹具站点，业务链路走 `--apw-env test`；一条命令混跑（`pytest tests flows --apw-env test`）会把夹具自测按真实环境起浏览器，14 条因找不到 `[data-testid=new-chat]` 等夹具元素而红，属**运行方式导致的假红**，不代表回归
 - 已知框架陷阱（通知邮件凭据落位，2026-10-14）：新增真实收件人配置后，`load_mail_config` 会从 `repo_root()` 读 `configs/notify.local.yaml`，**未做 repo_root 隔离的离线自测会被真实名单污染**（`tests/test_notify.py` 已统一 `monkeypatch.setattr(mail, "repo_root", lambda: tmp_path)` + 按 `<tmp>/configs/notify.local.yaml` 相对路径落盘夹具）
+- 已知框架陷阱（Playwright 启动失败连锁假错，2026-10-15）：驱动启动失败（如服务器缺浏览器）泄漏 sync 上下文后，后续所有用例连锁报 `Sync API inside the asyncio loop` 假错、把真因淹没——**排查只认第一条报错**；且平台/环境跳过判定发生在起驱动之后（`ApwFlowItem.runtest` 先 `get_runtime`），驱动一炸连本该 skip 的用例也 fail
 - 测试基线：`pytest tests`（**fixture 环境、独立跑**）**全绿 = 156 passed, 1 skipped**（2026-10-15 门禁修复后达成，含证据链路/失败取证/三态报告/脱敏用例/红线门禁）；工作流 4 条链路 + 对话并行切换 + Skills 广场 + 套组广场 + 报告样式库 2 条 + 操练场真实环境 3 次绿跑 + 桌面端对话冒烟真实客户端 3 次绿跑 + 桌面端工作流 4 条链路（打开运行/并行切换/AI 编写/AI 编写并行）真实客户端 3 次绿跑
 - 评审修复批次 P0 已交付（`.scratch/review-p0/`，6 票全 done）：prepare 失败与空步骤终态留痕、报告三态 + 跳过原因、run 目录唯一化 + 汇总合并、快照脱敏管道、定位器计数与解析同链
 - 留空待输入：仅 Electron 安装包 launch（T03；CDP attach 已有真实用例跑通=桌面端对话冒烟）

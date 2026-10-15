@@ -238,9 +238,11 @@ notify:
 
 ```bash
 bash run_scheduler.sh                      # 常驻：每 30 分钟跑 flows --apw-env test
+APW_NOTIFY=always APW_NOTIFY_ATTACH=1 bash run_scheduler.sh   # 同上 + 每轮结束自动发完整报告邮件
 bash run_scheduler.sh --interval-minutes 60  # 调整间隔
 bash run_scheduler.sh --once               # 单跑一轮就退出（cron / 联调）
 bash run_scheduler.sh -- --apw-env fixture   # `--` 后透传 pytest 参数（替换默认）
+# 停止：pkill -f apw.scheduler（SIGTERM 优雅停，当前轮子进程一并终止）
 # Windows：.venv\Scripts\python -m apw.scheduler（同一模块）
 ```
 
@@ -274,7 +276,8 @@ bash run_scheduler.sh -- --apw-env fixture   # `--` 后透传 pytest 参数（�
   */30 * * * * cd <部署目录> && .venv/bin/python -m apw.scheduler --once >> reports/scheduler/cron.log 2>&1
   ```
 
-- 部署（打包 → 上传 → 服务器解压）见 [`docs/DEPLOY.md`](docs/DEPLOY.md)。
+- 部署（打包 → 上传 → 服务器解压）与**服务启停 / 冒烟（发信）标准命令**见
+  [`docs/DEPLOY.md`](docs/DEPLOY.md)（「服务启停与冒烟」为唯一权威，每次部署交付必给）。
 
 ## 回归触发 API（外部服务触发跑测、取报告包）
 
@@ -289,6 +292,9 @@ nohup bash run_api.sh --host 0.0.0.0 --port 18787 > reports/api.log 2>&1 &   # �
 
 # Windows
 .venv\Scripts\python -m apw.api --port 18787
+
+# 停止
+pkill -f apw.api
 ```
 
 | 方法 | 路径 | 作用 |

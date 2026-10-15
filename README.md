@@ -232,19 +232,26 @@ notify:
 
 一键脚本**只跑 `flows`**：`tests` 是框架自测，需要 `--apw-env fixture`，与真实环境混跑会出假红。
 
-## 定时执行（测试阶段默认 30 分钟一轮）
+## 定时执行（固定间隔 / cron 钟点锚定）
 
-调度器 `python -m apw.scheduler`（Linux 用 `run_scheduler.sh` 等价包装），两种部署形态：
+调度器 `python -m apw.scheduler`（Linux 用 `run_scheduler.sh` 等价包装），排期在服务内自管：
 
 ```bash
 bash run_scheduler.sh                      # 常驻：每 30 分钟跑 flows --apw-env test
 APW_NOTIFY=always APW_NOTIFY_ATTACH=1 bash run_scheduler.sh   # 同上 + 每轮结束自动发完整报告邮件
 bash run_scheduler.sh --interval-minutes 60  # 调整间隔
-bash run_scheduler.sh --once               # 单跑一轮就退出（cron / 联调）
+bash run_scheduler.sh --cron "0 21 * * *"    # 每天 21:00（cron 钟点锚定，首轮到点才跑）
+bash run_scheduler.sh --cron "0 21 * * 1"    # 每周一 21:00（周频率）
+bash run_scheduler.sh --cron "0 21 1 * *"    # 每月 1 日 21:00（月频率）
+bash run_scheduler.sh --once               # 单跑一轮就退出（联调/冒烟；立即执行）
 bash run_scheduler.sh -- --apw-env fixture   # `--` 后透传 pytest 参数（替换默认）
 # 停止：pkill -f apw.scheduler（SIGTERM 优雅停，当前轮子进程一并终止）
 # Windows：.venv\Scripts\python -m apw.scheduler（同一模块）
 ```
+
+`--cron` 为标准 5 字段（分 时 日 月 周，周 0/7=周日）：支持 `*`、`n`、`a-b`、`*/s`、
+`a-b/s`、`n/s`、逗号列表、跨区间（`22-2`）；日与周同时限定时取「或」（经典 cron 语义）。
+`--cron` 与 `--interval-minutes` 互斥。
 
 - 固定节奏排期：一轮超时不叠跑、不补跑错过的槽位；每轮输出落 `reports/scheduler/run-<ts>.log`，
   测试报告照常落 `reports/<run_id>/`；Ctrl+C / SIGTERM 优雅停（当前轮子进程一并终止）
@@ -270,7 +277,8 @@ bash run_scheduler.sh -- --apw-env fixture   # `--` 后透传 pytest 参数（�
   systemctl enable --now apw-scheduler
   ```
 
-- **crontab 备选**（注意单轮 > 间隔分钟数时会叠跑，此时改用常驻）：
+- **crontab 备选**（一般不需要：每日/每周/每月排期用上面的 `--cron` 服务内自管；
+  系统 crontab 只在想让外部调度托管时用 `--once`）：
 
   ```cron
   */30 * * * * cd <部署目录> && .venv/bin/python -m apw.scheduler --once >> reports/scheduler/cron.log 2>&1

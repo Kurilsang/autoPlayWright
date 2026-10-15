@@ -147,26 +147,24 @@ APW_CHROMIUM_ARGS="--no-sandbox --disable-dev-shm-usage" bash run_flows.sh
 ### 定时任务（scheduler）：启动 / 停止
 
 ```bash
-# 启动（常驻，30 分钟一轮；每轮结束自动发完整报告邮件：正文 + report.zip 附件）
-APW_NOTIFY=always APW_NOTIFY_ATTACH=1 nohup bash run_scheduler.sh > reports/scheduler.log 2>&1 &
+# 启动（常驻，每天 21:00 一轮；每轮结束自动发完整报告邮件：正文 + report.zip 附件）
+APW_NOTIFY=always APW_NOTIFY_ATTACH=1 nohup bash run_scheduler.sh --cron "0 21 * * *" > reports/scheduler.log 2>&1 &
 
 # 停止（SIGTERM 优雅停：当前轮子进程一并终止，不留孤儿）
 pkill -f apw.scheduler
 pgrep -af apw.scheduler          # 无输出 = 已停
 tail -3 reports/scheduler.log    # 末行应为「[scheduler] 收到停止信号，退出」
 
-# 想要再起：重复上面的启动命令（nohup 幂等，先 pkill 确认没残留）
+# 想要再起：重复上面的启动命令（先 pkill 确认没残留）
 ```
 
+- **排期在服务内自管**（`--cron`，标准 5 字段：分 时 日 月 周，周 0/7=周日；不依赖系统 crontab）：
+  `0 21 * * *` 每天 21:00、`0 21 * * 1` 每周一、`0 21 1 * *` 每月 1 日、`0 9,21 * * *` 每天两次；
+  也支持 `--interval-minutes 30` 固定间隔（与 `--cron` 互斥）。cron 模式首轮到点才跑，不抢跑
 - 发信策略按需替换 `APW_NOTIFY=always|on-fail|on-change`（`on-change` 配 `APW_NOTIFY_PREV_FAILED` 基线）；
   收件人只改 `configs/notify.local.yaml` 的 `notify.report_to`
-- **cron 形态**（`--once`）停止方式不同：kill 杀不掉 cron 的下一轮，须 `crontab -e` 注释该行：
-
-  ```cron
-  */30 * * * * cd <部署目录> && APW_NOTIFY=always APW_NOTIFY_ATTACH=1 .venv/bin/python -m apw.scheduler --once >> reports/scheduler/cron.log 2>&1
-  ```
-
-- systemd 形态：`systemctl stop apw-scheduler`（unit 示例见 README「定时执行」）
+- systemd 形态：`systemctl stop apw-scheduler`（unit 示例见 README「定时执行」）；
+  系统 crontab 一般不再需要——要用时以 `--once`（立即跑一轮退出）交给外部调度
 
 ### 回归触发 API：启动 / 停止
 
@@ -230,3 +228,5 @@ user: "<部署机账号>"
   补进打包白名单（此前漏打包）
 - 2026-10-15 六次调整：新增「服务启停与冒烟」一节并定为**交付必给**——每次部署给出
   启动 / 停止 / 冒烟（发信）三组命令；启动、停止、`--test` 发信冒烟与端到端冒烟均已实测
+- 2026-10-15 七次调整：调度器支持 `--cron` 标准 cron 表达式（分 时 日 月 周，日/周同限取或），
+  每日/每周/每月频率统一由 Python 服务自管排期，不依赖系统 crontab；当前口径 = 每天 21:00

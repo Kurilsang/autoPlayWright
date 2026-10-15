@@ -1,16 +1,24 @@
-"""定时执行调度器：按固定间隔循环跑一轮 pytest 用例（测试阶段默认 30 分钟）。
+"""定时执行调度器：循环跑一轮 pytest 用例，排期支持固定间隔（默认 30 分钟）或 cron 表达式。
 
 两种部署形态（同一模块）：
 
 - 常驻：`python -m apw.scheduler`（前台 / tmux / systemd service 均可）
-- cron：`*/30 * * * * ... python -m apw.scheduler --once`（--once 单跑一轮退出）
+- 外部调度：`... python -m apw.scheduler --once`（--once 单跑一轮退出，立即执行）
 
 用法：
 
     python -m apw.scheduler                        # 每 30 分钟跑 flows --apw-env test
     python -m apw.scheduler --interval-minutes 60  # 调整间隔
-    python -m apw.scheduler --once                 # 只跑一轮（cron / 联调）
+    python -m apw.scheduler --cron "0 21 * * *"    # 每天 21:00（cron 钟点锚定，常驻）
+    python -m apw.scheduler --cron "0 21 * * 1"    # 每周一 21:00（周频率）
+    python -m apw.scheduler --cron "0 21 1 * *"    # 每月 1 日 21:00（月频率）
+    python -m apw.scheduler --once                 # 只跑一轮（联调/冒烟；立即执行）
     python -m apw.scheduler -- --apw-env fixture   # `--` 后透传 pytest 参数（替换默认）
+
+cron 语义（标准 5 字段：分 时 日 月 周，周 0/7=周日）：支持 `*`、`n`、`a-b`、`*/s`、
+`a-b/s`、`n/s`、逗号列表、跨区间（如 `22-2`）；日与周同时限定时按经典语义取「或」。
+排期语义：`--interval-minutes` 首轮启动即跑、此后按间隔顺延（错过的槽位不补跑）；
+`--cron` 钟点锚定，首轮也等到下一个触发点才跑（不抢跑、跨天/月/年顺延）。两者互斥。
 """
 from __future__ import annotations
 
@@ -37,6 +45,94 @@ def next_slot(prev: datetime, interval: timedelta, now: datetime) -> datetime:
     while slot <= now:
         slot += interval
     return slot
+
+
+# ---------- cron 表达式（标准 5 字段，自包含解析，不依赖系统 crontab/第三方库） ----------
+
+_FIELD_SPEC = (("minute", 0, 59), ("hour", 0, 23), ("day", 1, 31), ("month", 1, 12), ("dow", 0, 7))
+_MAX_SEARCH = timedelta(days=366 * 5)  # 未来 5 年找不到触发点即报错（如 2 月 30 日）
+
+
+class CronExpr:
+    """解析并按标准 cron 语义计算下一次触发时刻（精确到分，服务器本地时区）。"""
+
+    def __init__(self, expr: str) -> None:
+        parts = expr.split()
+        if len(parts) != 5:
+            raise ValueError(f"cron 表达式须为 5 个字段（分 时 日 月 周）：{expr!r}")
+        self.expr = expr
+        self.minutes = _parse_field(parts[0], 0, 59, "分钟")
+        self.hours = _parse_field(parts[1], 0, 23, "小时")
+        self.doms = _parse_field(parts[2], 1, 31, "日")
+        self.months = _parse_field(parts[3], 1, 12, "月")
+        self.dows = frozenset(0 if d == 7 else d for d in _parse_field(parts[4], 0, 7, "周"))
+        # 日/周经典语义：两者都限定（都不是字面 *）时取「或」，否则取「与」
+        self._dom_star = parts[2].strip() == "*"
+        self._dow_star = parts[4].strip() == "*"
+
+    def _day_matches(self, day: datetime) -> bool:
+        dom_ok = day.day in self.doms
+        dow_ok = (day.weekday() + 1) % 7 in self.dows  # cron 周 0=周日
+        if self._dom_star and self._dow_star:
+            return True
+        if self._dom_star:
+            return dow_ok
+        if self._dow_star:
+            return dom_ok
+        return dom_ok or dow_ok
+
+    def next_after(self, now: datetime) -> datetime:
+        """now 之后最近的触发时刻（严格大于 now，精确到分）。找不到（5 年内无解）抛 ValueError。"""
+        t = (now + timedelta(minutes=1)).replace(second=0, microsecond=0)
+        limit = now + _MAX_SEARCH
+        while t <= limit:
+            if t.month not in self.months:
+                t = (t.replace(day=1, hour=0, minute=0) + timedelta(days=32)).replace(day=1)
+            elif not self._day_matches(t):
+                t = (t + timedelta(days=1)).replace(hour=0, minute=0)
+            elif t.hour not in self.hours:
+                t = (t + timedelta(hours=1)).replace(minute=0)
+            elif t.minute not in self.minutes:
+                t += timedelta(minutes=1)
+            else:
+                return t
+        raise ValueError(f"cron 表达式 {self.expr!r} 在未来 5 年内没有触发点")
+
+
+def _parse_field(text: str, lo: int, hi: int, name: str) -> frozenset[int]:
+    """解析单个 cron 字段：`*`、`n`、`a-b`、`*/s`、`a-b/s`、`n/s`、列表；支持跨区间 `22-2`。"""
+    values: set[int] = set()
+    for part in text.split(","):
+        part = part.strip()
+        if not part:
+            raise ValueError(f"cron {name}字段含空项：{text!r}")
+        step = 1
+        if "/" in part:
+            part, _, step_text = part.partition("/")
+            if not step_text.isdigit() or int(step_text) <= 0:
+                raise ValueError(f"cron {name}字段步长非法：{text!r}")
+            step = int(step_text)
+        if part == "*":
+            start, end = lo, hi
+        elif "-" in part:
+            start_text, _, end_text = part.partition("-")
+            if not (start_text.lstrip("-").isdigit() and end_text.lstrip("-").isdigit()):
+                raise ValueError(f"cron {name}字段区间非法：{text!r}")
+            start, end = int(start_text), int(end_text)
+        elif part.isdigit():
+            start = end = int(part)
+            if "/" in text:  # `n/s` = 从 n 到上限按步长取（标准 cron 语义）
+                end = hi
+        else:
+            raise ValueError(f"cron {name}字段非法：{text!r}")
+        if not (lo <= start <= hi and lo <= end <= hi):
+            raise ValueError(f"cron {name}字段超出范围 {lo}-{hi}：{text!r}")
+        if start <= end:
+            values.update(range(start, end + 1, step))
+        else:  # 跨区间（如 22-2）：绕回
+            values.update(range(start, hi + 1, step))
+            values.update(range(lo, end + 1, step))
+    return frozenset(values)
 
 
 def run_once(
@@ -107,9 +203,31 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--interval-minutes", type=int, default=30, help="执行间隔分钟数（默认 30，测试阶段口径）"
     )
+    parser.add_argument(
+        "--cron",
+        default="",
+        metavar="EXPR",
+        help=(
+            "cron 表达式钟点锚定（分 时 日 月 周）：如 '0 21 * * *' 每天 21:00、"
+            "'0 21 * * 1' 每周一、'0 21 1 * *' 每月 1 日；与 --interval-minutes 互斥"
+        ),
+    )
     parser.add_argument("--root", default=".", help="仓库根目录（pytest 在此目录下执行）")
-    parser.add_argument("--once", action="store_true", help="只跑一轮就退出（cron/联调用）")
+    parser.add_argument(
+        "--once",
+        action="store_true",
+        help="只跑一轮就退出（联调/冒烟；立即执行，不受 --cron 影响）",
+    )
     args = parser.parse_args(own)
+
+    cron: CronExpr | None = None
+    if args.cron.strip():
+        if any(a == "--interval-minutes" or a.startswith("--interval-minutes=") for a in own):
+            parser.error("--cron 与 --interval-minutes 互斥：钟点锚定与固定间隔二选一")
+        try:
+            cron = CronExpr(args.cron.strip())
+        except ValueError as exc:
+            parser.error(str(exc))
 
     pytest_args = rest or DEFAULT_PYTEST_ARGS
     root = Path(args.root).resolve()
@@ -121,11 +239,16 @@ def main(argv: list[str] | None = None) -> int:
         signal.signal(sig, lambda *_: stop.set())
 
     interval = timedelta(minutes=args.interval_minutes)
-    print(
-        f"[scheduler] 每 {args.interval_minutes} 分钟一轮：{' '.join(cmd)}（cwd={root}）",
-        flush=True,
-    )
-    slot = datetime.now()  # 首轮立即执行
+    schedule = f"cron {cron.expr}" if cron is not None else f"每 {args.interval_minutes} 分钟一轮"
+    print(f"[scheduler] {schedule}：{' '.join(cmd)}（cwd={root}）", flush=True)
+    if cron is not None and not args.once:
+        try:
+            slot = cron.next_after(datetime.now())
+        except ValueError as exc:  # 无解表达式（如 2 月 30 日）启动即报错，不留空转服务
+            parser.error(str(exc))
+        print(f"[scheduler] 首轮 {slot:%Y-%m-%d %H:%M}（cron 到点触发，不抢跑）", flush=True)
+        stop.wait(max(0.0, (slot - datetime.now()).total_seconds()))
+    slot = datetime.now()  # 首轮：interval 启动即跑 / cron 到点即跑 / --once 立即跑
     while not stop.is_set():
         started = datetime.now()
         print(f"[scheduler] ▶ {started:%Y-%m-%d %H:%M:%S} 开始", flush=True)
@@ -134,9 +257,12 @@ def main(argv: list[str] | None = None) -> int:
         print(f"[scheduler] 完成：退出码 {code}，用时 {duration}s，日志 {log_path}", flush=True)
         if args.once:
             return code
-        slot = next_slot(slot, interval, datetime.now())
+        if cron is not None:
+            slot = cron.next_after(datetime.now())
+        else:
+            slot = next_slot(slot, interval, datetime.now())
         delay = max(0.0, (slot - datetime.now()).total_seconds())
-        print(f"[scheduler] 下一轮 {slot:%H:%M:%S}（{delay / 60:.1f} 分钟后）", flush=True)
+        print(f"[scheduler] 下一轮 {slot:%Y-%m-%d %H:%M:%S}（{delay / 60:.1f} 分钟后）", flush=True)
         stop.wait(delay)
     print("[scheduler] 收到停止信号，退出", flush=True)
     return 0

@@ -238,7 +238,7 @@ notify:
 
 ```bash
 bash run_scheduler.sh                      # 常驻：每 30 分钟跑 flows --apw-env test
-APW_NOTIFY=always APW_NOTIFY_ATTACH=1 bash run_scheduler.sh   # 同上 + 每轮结束自动发完整报告邮件
+APW_NOTIFY=always APW_NOTIFY_ATTACH=1 bash run_scheduler.sh   # 同上（每 30 分钟）+ 每轮自动发完整报告邮件
 bash run_scheduler.sh --interval-minutes 60  # 调整间隔
 bash run_scheduler.sh --cron "0 21 * * *"    # 每天 21:00（cron 钟点锚定，首轮到点才跑）
 bash run_scheduler.sh --cron "0 18 * * 5"    # 每周五 18:00（周频率）

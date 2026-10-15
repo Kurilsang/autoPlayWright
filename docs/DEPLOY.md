@@ -147,9 +147,15 @@ APW_CHROMIUM_ARGS="--no-sandbox --disable-dev-shm-usage" bash run_flows.sh
 ### 定时任务（scheduler）：启动 / 停止
 
 ```bash
-# 启动（常驻；当前排期 = 每天 21:00 + 每周五 18:00 各一轮；每轮自动发完整报告邮件）
+# 启动 · 形态一（当前口径，cron 多档并集）：每天 21:00 + 每周五 18:00 各一轮
 APW_NOTIFY=always APW_NOTIFY_ATTACH=1 nohup bash run_scheduler.sh \
   --cron "0 21 * * *" --cron "0 18 * * 5" > reports/scheduler.log 2>&1 &
+
+# 启动 · 形态二（固定间隔）：每 30 分钟一轮（与 --cron 互斥，两种形态二选一）
+APW_NOTIFY=always APW_NOTIFY_ATTACH=1 nohup bash run_scheduler.sh \
+  --interval-minutes 30 > reports/scheduler.log 2>&1 &
+
+# 两种形态都是每轮结束自动发完整报告邮件（正文 + report.zip 附件）
 
 # 停止（SIGTERM 优雅停：当前轮子进程一并终止，不留孤儿）
 pkill -f apw.scheduler
@@ -162,7 +168,8 @@ tail -3 reports/scheduler.log    # 末行应为「[scheduler] 收到停止信号
 - **排期在服务内自管**（`--cron`，标准 5 字段：分 时 日 月 周，周 0/7=周日；不依赖系统 crontab）：
   `0 21 * * *` 每天 21:00、`0 18 * * 5` 每周五 18:00、`0 21 1 * *` 每月 1 日、`0 9,21 * * *` 每天两次；
   **`--cron` 可给多次 = 多档排期并集**（当前口径两条见上）；单档只给一条 `--cron` 即可。
-  也支持 `--interval-minutes 30` 固定间隔（与 `--cron` 互斥）。cron 模式首轮到点才跑，不抢跑
+  也支持固定间隔形态（`--interval-minutes 30` 每 30 分钟，见上「形态二」；与 `--cron` 互斥）。
+  cron 模式首轮到点才跑，不抢跑；间隔模式首轮启动即跑
 - 发信策略按需替换 `APW_NOTIFY=always|on-fail|on-change`（`on-change` 配 `APW_NOTIFY_PREV_FAILED` 基线）；
   收件人只改 `configs/notify.local.yaml` 的 `notify.report_to`
 - systemd 形态：`systemctl stop apw-scheduler`（unit 示例见 README「定时执行」）；

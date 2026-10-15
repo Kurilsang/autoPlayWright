@@ -36,6 +36,7 @@ Linux / 服务器（网页端）：`bash setup_linux.sh --with-deps` 一键装�
 | 入口 | 用途 |
 |------|------|
 | `run_debug.bat` | 一键调试：`pytest flows --apw-env test --apw-headed --apw-slowmo 250`，额外参数透传 pytest（如 `-k smoke`、`--apw-env fixture`） |
+| `run_and_mail.bat` | 一键：跑 `flows` + 发带附件（run 目录 zip）的报告邮件；`--no-mail` 只跑、`--to/--cc` 覆盖收件人、`--env` 换环境，其余透传 pytest（见「报告邮件」） |
 | `run_full_debug.bat` | 全量调试跑全部用例（P1 框架自测 → P2 登录冒烟 → P3 夹具样例 → P4 网页端链路 → P5 桌面端链路）；桌面端自动带 `--remote-debugging-port=9333` 拉起客户端并等 CDP 就绪；`APW_SLOWMO` 调慢动作 |
 | `run_slides.bat` | 打开 `docs/banner-light.html` 项目报告页 |
 | `run_video.bat` | Remotion 演示动画出片（`video/` 本地资产，gitignored，可选） |
@@ -47,6 +48,7 @@ Linux / 服务器（网页端）：`bash setup_linux.sh --with-deps` 一键装�
 |------|------|
 | `bash setup_linux.sh` | 一次性安装：venv + pip 依赖 + Playwright chromium；`--with-deps` 另装 Chromium 系统库（需 root） |
 | `bash run_flows.sh` | 无头跑业务链路（默认 `flows --apw-env test`）；`--debug` 转窗口可见 + 250ms 慢动作；`--debug`/`--apw-env` 之外参数透传 pytest |
+| `bash run_and_mail.sh` | 一键：跑业务链路 + 发带附件报告邮件（同 `run_and_mail.bat`） |
 | `bash run_scheduler.sh` | 定时执行常驻（默认 30 分钟一轮）；`--once` 单跑一轮退出；`--` 后透传 pytest 参数（见「定时执行」） |
 
 **模块入口（跨平台，Python 直调）**
@@ -54,6 +56,7 @@ Linux / 服务器（网页端）：`bash setup_linux.sh --with-deps` 一键装�
 | 入口 | 用途 |
 |------|------|
 | `python -m apw.scheduler` | 定时调度内核（`run_scheduler.sh` 即其包装；Windows 定时用它） |
+| `python -m apw.notify` | 通知邮件直发（`--test` 冒烟 / `--summary <run-summary.json> --report-zip` 发报告；见「报告邮件」） |
 | `python -m apw.crawler` | 页面状态快照（AI 生成事实依据 / 改版 diff 基线；`--env`/`--config` 见「常用命令」） |
 | `python -m apw.reporter.html_report reports/<run_id>` | HTML 报告重渲染（会话结束已自动渲染一次） |
 
@@ -66,7 +69,8 @@ Linux / 服务器（网页端）：`bash setup_linux.sh --with-deps` 一键装�
 | `configs/envs/fixture.yaml` | 是 | fixture 本地夹具站点，零配置开箱即用 |
 | `configs/envs/test.example.yaml` → `test.yaml` | 模板入库，真实配置 gitignored | 真实测试环境（地址/登录选择器），真实值仅存本地/服务器 |
 | `configs/envs/desktop.yaml` | 是 | 桌面端环境（CDP attach 端点） |
-| `configs/secrets.local.yaml` | 否 | 登录凭据 `username`/`password`（或环境变量 `APW_USERNAME`/`APW_PASSWORD`，见下） |
+| `configs/secrets.local.yaml` | 否 | 测试环境表单登录凭据 `username`/`password`（或环境变量 `APW_USERNAME`/`APW_PASSWORD`，见下）+ 发信 `smtp:` 段 + API `api.token` |
+| `configs/notify.local.yaml` | 否 | **报告邮件收件人集中配置**（`notify:` 段：`report_to` 主收件人 / `cc` 抄送）；模板 `configs/notify.example.yaml` |
 | `configs/sanitize.example.yaml` → `sanitize.local.yaml` | 模板入库 | 脱敏映射（敏感串→占位符，快照/探查产物落盘前自动执行） |
 | `configs/desktop.local.example.bat` → `desktop.local.bat` | 模板入库 | 桌面客户端 exe 路径（`APW_DESKTOP_EXE`） |
 | `configs/auth-state.json` | 否 | 登录态回写（首次表单登录成功后生成，后续运行免登录） |
@@ -146,7 +150,7 @@ steps:
   - judge: { note: "v1 预留：LLM-as-Judge 后续接入" }
 ```
 
-真实环境链路可参考 `flows/aml_chat_smoke.yaml`（`--apw-env test` 执行；已入库 12 条业务链路见 `flows/*.yaml`，含桌面端 `flows/desktop_chat_smoke.yaml`；另有 DSL 示例 `examples/example_chat.yaml` 不计业务链路；清单与进度见 `docs/CASE_PROGRESS.md`）。
+真实环境链路可参考 `flows/aml_chat_smoke.yaml`（`--apw-env test` 执行；已入库 16 条业务链路见 `flows/*.yaml`，含桌面端 5 条 `flows/desktop_*.yaml`；另有 DSL 示例 `examples/example_chat.yaml` 不计业务链路；清单与进度见 `docs/CASE_PROGRESS.md`）。
 新页面「五步走」的完整指引（探查快照 → 定位器 → 页面对象 → flow → 验收门）见 `AGENTS.md`「怎么加用例」；
 目录与各层职责见 `docs/STRUCTURE.md`。
 
@@ -183,6 +187,50 @@ pytest flows --apw-env test --apw-headed --apw-slowmo 250
 # 页面状态快照（AI 生成的事实依据 / 页面改版 diff 基线）
 python -m apw.crawler --env test --config configs/crawl/aml_chat.yaml
 ```
+
+## 报告邮件（跑完自动发摘要 + 附件）
+
+跑完业务链路后把本轮 run 目录打成 zip 附上，发摘要给收件人。
+
+```powershell
+# 一键：跑 flows 并发送（Windows / Linux）
+.\run_and_mail.bat
+bash run_and_mail.sh
+
+# 只跑不发 / 换环境 / 临时改收件人（其余参数透传 pytest）
+.\run_and_mail.bat --no-mail
+.\run_and_mail.bat --env fixture
+.\run_and_mail.bat --to a@x.com,b@y.com --cc lead@x.com
+
+# 等价模块入口（额外做「附件 = API report.zip」逐字节核对）
+.venv\Scripts\python scripts\console_summary.py --targets flows --env test --mail
+```
+
+**收件人集中配置** —— 改名单只动 `configs/notify.local.yaml`（gitignored），不用碰凭据文件、不用动命令行：
+
+```yaml
+notify:
+  report_to:                    # 主收件人（加一行 = 加一个收件人）
+    - <user>@<domain>
+  cc:                           # 可选：抄送（只进 SMTP 信封，不出现在 To 头）
+    - <lead>@<domain>
+```
+
+优先级：`smtp.to`（secrets）< `notify.local.yaml` < 环境变量 `APW_NOTIFY_TO` < 命令行 `--to/--cc`。
+`report_to` **非空即整体取代** `to`（可给报告单独一份名单）。
+
+**发信通道**（`smtp.transport`）：
+
+| 通道 | 认证要求 | 附件 |
+|---|---|---|
+| `smtp` + **私人邮箱授权码** | 只需自己的邮箱授权码 | ✅ **推荐**（无需任何内网权限，可无人值守） |
+| `smtp` + `xoauth2` | M365 交互式 `--login` | ✅ |
+| `ews` / `foxmail` | 无（foxmail 复用本机客户端登录态） | ❌ |
+
+**附件与回归触发 API 同口径**：邮件附件直接调 `apw.api.build_report_zip`，
+与外部服务 `GET /runs/<id>/report.zip` 下载到的包**逐字节一致**（同一函数产物）。
+
+一键脚本**只跑 `flows`**：`tests` 是框架自测，需要 `--apw-env fixture`，与真实环境混跑会出假红。
 
 ## 定时执行（测试阶段默认 30 分钟一轮）
 

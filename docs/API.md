@@ -1,4 +1,4 @@
-﻿# 回归触发 API（契约）
+# 回归触发 API（契约）
 
 给**外部服务**用的接口：外部服务定时触发回归 → 拿到 zip 产物 → 用**它自己的**邮件通道外发。
 
@@ -196,11 +196,29 @@ curl -H "Authorization: Bearer $TOKEN" -o report.zip \
 | 模块 | 定位 |
 |---|---|
 | `apw.scheduler` | 本机定时跑（不取结果外发）；与外部服务调度**二选一**，别并用 |
-| `apw.notify` | 本机直接发信（smtp/ews/foxmail）；跨平台受限，保留给本机场景 |
+| `apw.notify` | 本机直接发信（smtp/ews/foxmail）；**附件复用本文件的 `build_report_zip`**（见下），附件受通道限制 |
 | `apw.api` | 外部服务触发 + 取产物，**发信由外部服务负责**（跨平台推荐） |
+
+### 邮件附件与 `report.zip` 同口径
+
+`apw.notify` 发附件时直接调本模块的 `build_report_zip`（`apw.notify.mail.attach_run_zip`），
+因此**外部服务从 `GET /runs/<id>/report.zip` 下载的包，与本项目邮件里附的 zip 是同一个函数的产物**
+（同一文件名规则 `<run_id>-report.zip`、同样的排除规则），不会出现两条路径各自打包导致内容漂移：
+
+```python
+from apw.notify import attach_run_zip          # → [(文件名, 字节)]
+from apw.api import build_report_zip           # 同一实现
+assert attach_run_zip(run_dir)[0][1] == build_report_zip(run_dir)
+```
+
+CLI 侧：`python -m apw.notify --summary <run-summary.json> --report-zip`（`--zip-sanitize` 脱敏）。
+
+**通道限制**：`smtp` 支持附件；`ews`/`foxmail` 不支持（`foxmail` = mailto 拉写信窗，
+带不了附件），选到这两条通道且要附件时会**显式报错**，不会静默丢附件。
 
 ## 注意
 
 - **产物含真实内网 URL/产品名/截图**：zip 出到本项目之外即属外发。内网可信服务直接发即可；
-  若需过外部通道，把 `build_report_zip(sanitize=True)` 接进接口（复用 `apw.sanitize` 脱敏，默认关闭）。
+  若需过外部通道，把 `build_report_zip(sanitize=True)` 接进接口（复用 `apw.sanitize` 脱敏，默认关闭）；
+  邮件侧同口径用 `--zip-sanitize`。
 - 触发接口 = 能跑任意 pytest 参数，**必须配 token**，不要裸奔在公网。

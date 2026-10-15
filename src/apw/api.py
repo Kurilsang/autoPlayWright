@@ -277,7 +277,12 @@ def make_handler(manager: RunManager, token: str, base_url: str = ""):
         server_version = "apw-api/1.0"
 
         def log_message(self, fmt, *args):  # noqa: ANN001, ANN002 - 精简访问日志
-            print(f"[apw-api] {self.address_string()} {fmt % args}", flush=True)
+            message = fmt % args
+            log = getattr(self.server, "apw_log", None)
+            if log is not None:
+                log(f"[apw-api] {self.address_string()} {message}")
+                return
+            print(f"[apw-api] {self.address_string()} {message}", flush=True)
 
         # ---- 工具 ----
         def _json(self, code: int, payload: dict) -> None:

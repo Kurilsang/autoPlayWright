@@ -85,15 +85,18 @@ def send_ews(
     to: list[str] | None = None,
     html: str | None = None,  # noqa: ARG001 - EWS 文本正文，HTML 暂不支持
     attachments: list | None = None,
+    attachments_blob: list | None = None,
 ) -> str:
     """EWS 发信，返回 RootItemId。附件暂不支持（显式报错，不静默丢）。"""
     from apw.notify import oauth  # 惰性导入避免循环依赖
 
-    if attachments:
+    if attachments or attachments_blob:
         raise NotImplementedError("EWS 通道暂不支持附件（请用 smtp 通道）")
-    recipients = list(to or cfg.to)
+    recipients = list(dict.fromkeys(list(to or cfg.to) + list(cfg.cc)))
     if not recipients:
-        raise ValueError("收件人为空：配置 smtp.to / APW_NOTIFY_TO / --to 至少其一")
+        raise ValueError(
+            "收件人为空：配置 smtp.to（或 smtp.report_to）/ APW_NOTIFY_TO / --to 至少其一"
+        )
     token = oauth.get_token(cfg, scope=EWS_SCOPE)
     envelope = build_ews_envelope(subject=subject, body=body, to=recipients)
     request = urllib.request.Request(

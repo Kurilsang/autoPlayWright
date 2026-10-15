@@ -16,6 +16,7 @@ build/
 video/
 run_video.bat
 configs/secrets.local.yaml
+configs/notify.local.yaml
 configs/deploy.local.yaml
 configs/.mail-token.local.json
 configs/desktop.local.bat

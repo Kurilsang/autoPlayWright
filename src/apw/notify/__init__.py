@@ -7,6 +7,7 @@
 """
 from apw.notify.mail import (
     MailConfig,
+    attach_run_zip,
     build_message,
     build_summary_mail,
     load_mail_config,
@@ -17,6 +18,7 @@ from apw.notify.mail import (
 
 __all__ = [
     "MailConfig",
+    "attach_run_zip",
     "build_message",
     "build_summary_mail",
     "load_mail_config",

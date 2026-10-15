@@ -4,8 +4,13 @@
   --login                   OAuth2 设备码登录（MFA 租户一次性交互，缓存 token）
   --summary reports/…/run-summary.json   发送 run 摘要（配合 --policy）
   --policy off|always|on-fail|on-change  发信策略（summary 模式生效）
+  --report-zip              附上 run 目录 zip（口径同 apw.api 的
+                            GET /runs/<id>/report.zip；缺省取 --summary 同级目录）
   --to a@x,b@y              覆盖收件人（逗号分隔）
-  --attach PATH             附加文件（可多次）
+  --cc a@x,b@y              抄送（逗号分隔）
+  --attach PATH             附加磁盘文件（可多次）
+
+收件人集中配置见 configs/notify.example.yaml（smtp.to / smtp.report_to / smtp.cc）。
 """
 from __future__ import annotations
 
@@ -16,11 +21,18 @@ import sys
 from datetime import datetime
 
 from apw.notify.mail import (
+    MailConfig,
     build_message,
     load_mail_config,
     notify_from_summary,
     send_mail,
 )
+
+
+def _addresses(value: str | None) -> list[str] | None:
+    if not value:
+        return None
+    return [a.strip() for a in value.split(",") if a.strip()]
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -40,14 +52,29 @@ def main(argv: list[str] | None = None) -> int:
         help="发信策略（--summary 模式生效，默认 on-fail）",
     )
     parser.add_argument("--to", metavar="ADDRS", help="收件人覆盖，逗号分隔")
+    parser.add_argument("--cc", metavar="ADDRS", help="抄送，逗号分隔")
     parser.add_argument("--attach", action="append", default=[], metavar="PATH", help="附件")
+    parser.add_argument(
+        "--report-zip",
+        action="store_true",
+        help="附上 run 目录 zip（与 apw.api 的 report.zip 同函数同内容）",
+    )
+    parser.add_argument(
+        "--zip-sanitize",
+        action="store_true",
+        help="zip 内文本产物过 apw.sanitize 脱敏（发到项目外部时建议开）",
+    )
+    parser.add_argument("--env-label", default="", help="写入正文的环境名（如 test/fixture）")
     args = parser.parse_args(argv)
 
     if not args.test and not args.summary and not args.login and not args.login_browser:
         parser.error("需要 --login、--login-browser、--test 或 --summary")
 
     cfg = load_mail_config()
-    to = [a.strip() for a in args.to.split(",") if a.strip()] if args.to else None
+    to = _addresses(args.to)
+    cc = _addresses(args.cc)
+    if cc:
+        cfg = MailConfig(**{**cfg.model_dump(), "cc": cc})
 
     try:
         if args.login or args.login_browser:
@@ -70,16 +97,11 @@ def main(argv: list[str] | None = None) -> int:
                 f"主机: {platform.node()}\n"
                 f"SMTP: {cfg.host}:{cfg.port} ({cfg.security})\n"
             )
+            attachments = args.attach or None
             msg, recipients = build_message(
-                cfg, subject=subject, body=body, to=to, attachments=args.attach or None
+                cfg, subject=subject, body=body, to=to, attachments=attachments
             )
-            send_mail(
-                cfg,
-                subject=subject,
-                body=body,
-                to=to,
-                attachments=args.attach or None,
-            )
+            send_mail(cfg, subject=subject, body=body, to=to, attachments=attachments)
             print(f"[notify] 冒烟邮件已发送 → {', '.join(recipients)} ({msg['Message-ID']})")
             return 0
 
@@ -88,6 +110,10 @@ def main(argv: list[str] | None = None) -> int:
             policy=args.policy,
             cfg=cfg,
             to=to,
+            report_zip=args.report_zip,
+            attach=args.attach or None,
+            sanitize=args.zip_sanitize,
+            env=args.env_label,
         )
         if sent:
             print(f"[notify] 摘要邮件已发送（policy={args.policy}）")

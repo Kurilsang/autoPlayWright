@@ -1,0 +1,35 @@
+# 桌面端工作流：打开并运行（手动「编辑」写固定脚本）→ 保存 → 运行（非 AI 编码）。
+# 断言全部为确定性内容（组件状态/固定脚本产物/输入回显），不断言 LLM 措辞。
+# 产品约定：运行的是服务端已保存版本，手动改动必须先「保存」（保存后按钮转 disabled）。
+# 运行 = 详情「运行」开运行视图 → 运行视图「运行」执行；运行后台执行，视图切走不中断。
+meta:
+  id: desktop-workflow-manual
+  name: 桌面端工作流：打开运行（手动写码保存运行）
+  platforms: [desktop]
+  envs: [desktop]
+  tags: [P1, workflow, manual-code]
+  owner: qa
+steps:
+  - do: { page: desktop_workflow, action: open_section, args: {} }
+  - do: { page: desktop_workflow, action: new_workflow, args: { name: "apw-desktop-manual" } }
+  - do:
+      page: desktop_workflow
+      action: type_script
+      args:
+        script: |
+          def main(wf):
+              with wf.step("n1", "打印 hello"):
+                  wf.log("hello")
+                  wf.set_output("greeting", "hello")
+  - assert: { type: visible, page: desktop_workflow, target: flow_node_hello }
+  - do: { page: desktop_workflow, action: open_run_view, args: {} }
+  - assert: { type: visible, page: desktop_workflow, target: run_input_section }
+  - assert: { type: visible, page: desktop_workflow, target: run_history_section }
+  - do: { page: desktop_workflow, action: start_run, args: {} }
+  - do: { page: desktop_workflow, action: wait_run_done, args: { timeout_ms: 120000 } }
+  - do: { page: desktop_workflow, action: capture_context, args: {} }
+  - assert: { type: visible, page: desktop_workflow, target: run_completed_badge }
+  - assert: { type: visible, page: desktop_workflow, target: run_done_marker }
+  - assert: { type: text_contains, page: desktop_workflow, target: run_started_name_line, expected: "apw-desktop-manual" }
+  - assert: { type: text_contains, page: desktop_workflow, target: run_log_hello, expected: "hello" }
+  - judge: { note: "v1 预留：运行产物质量由 LLM-as-Judge 判定" }

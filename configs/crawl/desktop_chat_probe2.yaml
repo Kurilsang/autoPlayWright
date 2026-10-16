@@ -1,6 +1,6 @@
 # 桌面客户端对话链路第二轮探查（生成侧资产）：活体走一遍发消息，
 # 采集 新任务 → 输入 → 发送 → 生成中 → 完成 各状态结构（定位器/完成信号候选）。
-# 产物入 .scratch/autoPlayWright/snapshots/desktop/（gitignored，落盘自动脱敏）。
+# 产物入 .scratch/auto_playwright/snapshots/desktop/（gitignored，落盘自动脱敏）。
 name: desktop-chat-probe2
 targets:
   - id: desktop-chat-turn

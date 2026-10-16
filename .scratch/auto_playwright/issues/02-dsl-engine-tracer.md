@@ -1,6 +1,6 @@
 # 02: DSL→pytest→JSON 报告最小全链路（核心 tracer bullet）
 
-> **Status: done（2026-09-22 交付）**
+> **Status: done（2026-09-22 交付，commit cbeddaa/8a4db6b）**
 
 **What to build:** 测试工程师新增一个 YAML 文件，即能让一条手写业务链路（新建会话→发送消息→等待流式输出结束→断言回复区出现）在 Web 端被 pytest 自动收集执行，并在报告中看到步骤级结构化结果。从此「新增用例 ≈ 写 YAML」成立，pytest 是无感知执行壳。
 

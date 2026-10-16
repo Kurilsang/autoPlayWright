@@ -1,0 +1,214 @@
+# 桌面客户端工作流面板（Electron 打包 Web 界面，CDP 探查 2026-10-12）。
+# 真实应用无 data-testid；候选优先 role+name / placeholder，结构性 css 兜底。
+# 探查事实（configs/crawl/desktop_workflow_probe{,2,3,4,5}.yaml）：
+# - 工作流区是 view slot 栈（div.wf-view-slot）：列表为底座，详情/运行依次叠放，
+#   「← 返回」回上一槽（详情槽返回后保活、运行槽返回即销毁），只有一个槽带 is-active；
+# - 脚本编辑器 = CodeMirror（.cm-content，整体 insert_text 避免逐键自动缩进），
+#   保存后「保存」按钮转 disabled（干净态）；流程结构节点保存后解析渲染；
+# - 运行 = 详情「运行」开运行视图（运行输入/历史运行）→ 再点「运行」执行；
+#   运行后台执行、视图切走不中断（卡片「进行中」+ 最近运行「运行中」在场）；
+# - 身份锚点：详情标题 h3 / 运行视图标题 / 运行日志「工作流开始：<名>」行。
+page: desktop_workflow
+locators:
+  # ---- 导航与浮层 ----
+  - name: nav_workflow
+    source: ai
+    candidates:
+      - { by: role, value: button, name: 工作流 }
+      # 结构候选先于裸 text：text 精确匹配会在工作流面板开着时错配面板标题 <h2>工作流</h2>（2026-10-12 实测）
+      - { by: css, value: "nav.sidebar-nav button.sidebar-nav-item:has(.sidebar-nav-label:text-is('工作流'))" }
+      - { by: text, value: 工作流, exact: true }
+  - name: toast_close
+    source: manual
+    candidates:
+      # 「服务连接异常」等常驻 toast 的图标关闭钮（aria-label=关闭，无文本），会拦截点击
+      - { by: css, value: "div.integration-toast button[aria-label='关闭']" }
+  # ---- 列表：新建弹窗 ----
+  - name: new_workflow_button
+    source: ai
+    candidates:
+      - { by: role, value: button, name: 新建工作流 }
+      - { by: css, value: "button.btn-primary.wf-btn:text-is('新建工作流')" }
+  - name: wf_dialog_name_input
+    source: ai
+    candidates:
+      - { by: placeholder, value: "例如：周报汇总" }
+  - name: wf_dialog_create_button
+    source: ai
+    candidates:
+      - { by: css, value: "footer.wf-modal-footer button.btn-primary" }   # 未填名称时 disabled（title=请填写名称）
+  # ---- 列表：工作流卡片（后台运行状态观察 = 并行切换证据）----
+  - name: wf_card
+    source: manual
+    candidates:
+      - { by: css, value: "li.wf-card" }
+  - name: wf_card_name
+    source: manual
+    candidates:
+      - { by: css, value: "span.wf-card-name" }
+  - name: wf_card_open_button
+    source: manual
+    candidates:
+      - { by: css, value: "div.wf-card-actions button:text-is('打开')" }
+  - name: wf_card_running_chip
+    source: manual
+    candidates:
+      - { by: css, value: "li.wf-card span.wf-badge-running" }   # 「进行中」角标 = 后台运行在跑
+  - name: wf_card_running_badge
+    source: manual
+    candidates:
+      - { by: css, value: "li.wf-card span.wf-run-state.is-running" }   # 「最近运行：运行中」转圈徽标
+  # ---- view slot 栈：返回与身份 ----
+  - name: active_back_button
+    source: manual
+    candidates:
+      - { by: css, value: "div.wf-view-slot.is-active button:text-is('← 返回')" }
+  - name: list_active
+    source: manual
+    candidates:
+      - { by: css, value: "div.wf-view-slot.is-active div.wf-list" }
+  - name: detail_title
+    source: manual
+    candidates:
+      - { by: css, value: "div.wf-view-slot.is-active div.wf-subheader-identity h3" }
+  - name: run_view_title
+    source: manual
+    candidates:
+      - { by: css, value: "div.wf-view-slot.is-active h3.wf-subheader-title" }
+  # ---- 详情：AI 编写助手面板（aside.wf-author，生成后台执行）----
+  - name: ai_panel
+    source: manual
+    candidates:
+      - { by: css, value: "div.wf-view-slot.is-active aside.wf-author" }
+  - name: ai_panel_toggle
+    source: manual
+    candidates:
+      - { by: css, value: "div.wf-view-slot.is-active section.wf-detail-script button:text-is('AI 编写')" }
+  - name: ai_panel_toggle_active
+    source: manual
+    candidates:
+      # 面板打开态开关（is-active + aria-pressed=true）= 面板在场的状态标记
+      - { by: css, value: "section.wf-detail-script button.is-active:text-is('AI 编写')" }
+  - name: ai_prompt_input
+    source: manual
+    candidates:
+      - { by: css, value: "div.wf-view-slot.is-active textarea.wf-author-input" }   # 描述要实现的流程…（Enter 发送）
+  - name: ai_send_button
+    source: manual
+    candidates:
+      - { by: css, value: "div.wf-view-slot.is-active aside.wf-author button.btn-primary:text-is('发送')" }
+  - name: ai_stop_button
+    source: manual
+    candidates:
+      # 生成中「发送」钮变「停止」（btn-ghost）= 生成在跑的 UI 状态
+      - { by: css, value: "div.wf-view-slot.is-active aside.wf-author button:text-is('停止')" }
+  - name: ai_user_message
+    source: manual
+    candidates:
+      # 需求回显气泡（输入回显，确定性锚点）
+      - { by: css, value: "div.wf-view-slot.is-active div.wf-author-messages div.message.user.wf-author-user div.bubble" }
+  - name: ai_assistant_message
+    source: manual
+    candidates:
+      - { by: css, value: "div.wf-view-slot.is-active div.wf-author-messages div.message.assistant.wf-author-turn" }
+  - name: ai_tool_title
+    source: manual
+    candidates:
+      # 助手工具调用标题（Read script / Save script 等 App 固定文案，观察证据）
+      - { by: css, value: "div.wf-view-slot.is-active div.wf-author-messages span.msg-tool-title" }
+  - name: ai_save_tool
+    source: manual
+    candidates:
+      # 「Save script」工具调用在场 = 助手已写盘（产品契约：改写后直接保存并校验）
+      - { by: css, value: "div.wf-view-slot.is-active div.wf-author-messages span.msg-tool-title:text-is('Save script')" }
+  - name: ai_saved_notice
+    source: manual
+    candidates:
+      # 自动保存成功提示（「助手已保存脚本，脚本与流程图已刷新」）——瞬态，仅观察
+      - { by: css, value: "div.wf-view-slot.is-active div.wf-notice.is-success" }
+  - name: ai_empty_marker
+    source: manual
+    candidates:
+      - { by: text, value: 说明你的需求, exact: false }   # 面板空态占位（会话未开始）
+  # ---- 详情：脚本编辑与流程结构 ----
+  - name: code_editor
+    source: manual
+    candidates:
+      - { by: css, value: "div.wf-view-slot.is-active section.wf-detail-script .cm-content" }
+  - name: save_button
+    source: manual
+    candidates:
+      - { by: css, value: "div.wf-view-slot.is-active section.wf-detail-script button:text-is('保存')" }
+  - name: flow_node
+    source: manual
+    candidates:
+      - { by: css, value: "div.wf-view-slot.is-active section.wf-detail-flow span.wf-node-label" }
+  - name: flow_node_hello
+    source: manual
+    candidates:
+      - { by: text, value: 打印 hello }   # 固定脚本 wf.step 标题（非 AI 用例确定性锚点）
+  - name: flow_node_alpha
+    source: manual
+    candidates:
+      - { by: text, value: 甲甲甲步骤 }   # 并行切换用例 A 的脚本节点（身份锚点）
+  - name: flow_node_beta
+    source: manual
+    candidates:
+      - { by: text, value: 乙乙乙步骤 }   # 并行切换用例 B 的脚本节点（身份锚点）
+  - name: detail_run_button
+    source: manual
+    candidates:
+      - { by: css, value: "div.wf-view-slot.is-active div.wf-detail div.wf-subheader button.btn-primary:text-is('运行')" }
+  # ---- 运行视图：运行输入 / 状态 / 日志 / 历史 ----
+  - name: run_input_section
+    source: manual
+    candidates:
+      - { by: css, value: "div.wf-view-slot.is-active section.wf-card-section[aria-label='运行输入']" }
+  - name: run_execute_button
+    source: manual
+    candidates:
+      - { by: css, value: "div.wf-view-slot.is-active section[aria-label='运行输入'] button.btn-primary:text-is('运行')" }
+  - name: run_history_section
+    source: manual
+    candidates:
+      - { by: css, value: "div.wf-view-slot.is-active section.wf-card-section[aria-label='历史运行']" }
+  - name: run_status_section
+    source: manual
+    candidates:
+      - { by: css, value: "div.wf-view-slot.is-active section.wf-run-status" }
+  - name: run_running_badge
+    source: manual
+    candidates:
+      - { by: css, value: "div.wf-view-slot.is-active section.wf-run-status span.wf-run-state.is-running" }
+  - name: run_completed_badge
+    source: manual
+    candidates:
+      - { by: css, value: "div.wf-view-slot.is-active section.wf-run-status span.wf-run-state.is-completed" }
+  - name: cancel_run_button
+    source: manual
+    candidates:
+      - { by: css, value: "div.wf-view-slot.is-active section.wf-run-status button:text-is('取消运行')" }
+  - name: run_flow_summary
+    source: manual
+    candidates:
+      - { by: css, value: "div.wf-view-slot.is-active span.wf-run-flow-summary" }   # 「共 N 步 · N 步已完成」
+  - name: run_log_line
+    source: manual
+    candidates:
+      - { by: css, value: "div.wf-view-slot.is-active div.wf-log-body div.wf-log-line" }
+  - name: run_started_name_line
+    source: manual
+    candidates:
+      - { by: css, value: "div.wf-view-slot.is-active div.wf-log-line:has-text('工作流开始')" }   # 首行含工作流名（输入回显）
+  - name: run_done_marker
+    source: manual
+    candidates:
+      - { by: css, value: "div.wf-view-slot.is-active div.wf-log-line:has-text('工作流完成')" }   # 「✅ 工作流完成。…」完成行
+  - name: run_log_hello
+    source: manual
+    candidates:
+      - { by: css, value: "div.wf-view-slot.is-active div.wf-log-line:has-text('hello')" }   # 固定脚本日志输出行
+  - name: run_idle_marker
+    source: manual
+    candidates:
+      - { by: text, value: 填写输入后点击, exact: false }   # 运行视图未执行/未挂载运行时的空态占位

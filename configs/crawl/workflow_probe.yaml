@@ -1,7 +1,7 @@
 # 工作流功能首轮探查配置（生成侧资产）：找工作流入口 + 逐入口页面结构快照。
 # 探查期用 probe 保留名的通用原语推进状态；页面对象产品化后可把 probe 步骤
 # 替换为 page: aml_workflow 的动作（参考 configs/crawl/aml_chat.yaml）。
-# 产物落 .scratch/autoPlayWright/snapshots/<env>/（gitignored）。
+# 产物落 .scratch/auto_playwright/snapshots/<env>/（gitignored）。
 name: workflow-probe
 targets:
   - id: nav-scan

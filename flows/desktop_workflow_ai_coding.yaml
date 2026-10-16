@@ -1,0 +1,33 @@
+# 桌面端工作流：AI 编写（「AI 编写」助手提交需求生成工作流）→ 运行。
+# 断言全部为确定性内容（需求输入回显/组件渲染/完成标记/名字回显）；
+# AI 生成的脚本与措辞只进 capture_context 证据，不作断言。
+# 产品约定：助手改写后直接保存并校验（生成完成 = 停止消失 + 发送回归 + 脚本落盘解析）。
+meta:
+  id: desktop-workflow-ai-coding
+  name: 桌面端工作流：AI 编写生成工作流并运行
+  platforms: [desktop]
+  envs: [desktop]
+  tags: [P1, workflow, ai-coding]
+  owner: qa
+steps:
+  - do: { page: desktop_workflow, action: open_section, args: {} }
+  - do: { page: desktop_workflow, action: new_workflow, args: { name: "apw-desktop-ai" } }
+  - do:
+      page: desktop_workflow
+      action: generate_ai
+      args:
+        prompt: "生成一个最简工作流：用纯脚本分步打印 ai-gen-hello 并输出结果"
+        timeout_ms: 180000
+  - do: { page: desktop_workflow, action: capture_context, args: {} }
+  - assert: { type: visible, page: desktop_workflow, target: ai_user_message }
+  - assert: { type: text_contains, page: desktop_workflow, target: ai_user_message, expected: "ai-gen-hello" }
+  - assert: { type: visible, page: desktop_workflow, target: ai_assistant_message }
+  - assert: { type: visible, page: desktop_workflow, target: flow_node }
+  - do: { page: desktop_workflow, action: open_run_view, args: {} }
+  - do: { page: desktop_workflow, action: start_run, args: {} }
+  - do: { page: desktop_workflow, action: wait_run_done, args: { timeout_ms: 180000 } }
+  - do: { page: desktop_workflow, action: capture_context, args: {} }
+  - assert: { type: visible, page: desktop_workflow, target: run_completed_badge }
+  - assert: { type: visible, page: desktop_workflow, target: run_done_marker }
+  - assert: { type: text_contains, page: desktop_workflow, target: run_started_name_line, expected: "apw-desktop-ai" }
+  - judge: { note: "v1 预留：生成脚本质量由 LLM-as-Judge 判定" }

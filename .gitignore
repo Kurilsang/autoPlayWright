@@ -16,6 +16,9 @@ build/
 video/
 run_video.bat
 configs/secrets.local.yaml
+configs/notify.local.yaml
+configs/deploy.local.yaml
+configs/.mail-token.local.json
 configs/desktop.local.bat
 configs/auth-state.json
 configs/envs/test.yaml
@@ -25,5 +28,12 @@ workspace/
 .scratch/**/snapshots/**/*.json
 .scratch/**/snapshots/**/*.html
 .scratch/**/snapshots/**/*.txt
+# 外部真实 MCP 的 npm 安装目录（scripts/setup_external_mcp.py 落地，体积大且可再生）
+.scratch/mcp_servers/
+# MCP 调用流水账（夹具 apw_test_mcp.py 与代理 mcp_proxy.py 运行时追加写；含真实调用记录，勿入库）
+.scratch/auto_playwright/mcp_calls.jsonl
+# 运行时快照产物（.scratch/auto_playwright/ 下的任务票是入库内容，故不整目录忽略）
+.scratch/auto_playwright/snapshots/
+node_modules/
 
 pytest_out.txt

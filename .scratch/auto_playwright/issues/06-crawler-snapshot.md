@@ -6,7 +6,7 @@
 
 **Status:** in-progress（爬取器已交付，待人工检查与 08 基线固化）
 
-> 运行：`python -m apw.crawler --env test --config configs/crawl/aml_chat.yaml [--headed] [--slowmo 250]`；示例配置 `configs/crawl/{fixture_chat,aml_chat}.yaml`；快照产物 `.scratch/autoPlayWright/snapshots/<env>/`（git 版本化）。
+> 运行：`python -m apw.crawler --env test --config configs/crawl/aml_chat.yaml [--headed] [--slowmo 250]`；示例配置 `configs/crawl/{fixture_chat,aml_chat}.yaml`；快照产物 `.scratch/auto_playwright/snapshots/<env>/`（git 版本化）。
 
 - [x] 遍历器复用 AppDriver，遍历入口与范围可配置（爬取配置 YAML：targets × 状态步骤）
 - [x] 快照 JSON schema 定义并校验（`src/apw/crawler/schema.py`，pydantic）

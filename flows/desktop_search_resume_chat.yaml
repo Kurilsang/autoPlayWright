@@ -1,0 +1,32 @@
+# 桌面客户端链路①：新建会话 → 发消息 → 搜索命中该会话 → 打开 → 继续下一轮对话。
+# （Zepeng 待补用例：客户端桌面端「新建会话后在搜索中搜到、打开并继续下一步对话」）
+# 断言全部为确定性内容（组件渲染/用户输入回显/搜索命中回显），不断言 LLM 措辞。
+# 说明：搜索关键词用唯一标记 APW-SRCH-CASE1，避免依赖既有历史会话，自包含可复跑。
+meta:
+  id: desktop-search-resume-chat
+  name: 桌面端：新建会话 → 搜索命中 → 打开并继续对话
+  platforms: [desktop]
+  envs: [desktop]
+  tags: [P0, search]
+  owner: qa
+steps:
+  # ---- 1) 新建会话并产生可搜索内容 ----
+  - do: { page: desktop_chat, action: new_task, args: {} }
+  # 推理型消息：保证 Thought 思考块渲染（纯寒暄/极简请求偶发走快速路径，Thought 块整条缺失）
+  - do: { page: desktop_chat, action: send_message, args: { text: "APW-SRCH-CASE1 请分步推理后回答：127 是质数吗？" } }
+  - do: { page: desktop_chat, action: wait_reply_done, args: { timeout_ms: 120000 } }
+  # ---- 2) 搜索命中 ----
+  - do: { page: desktop_search, action: open_panel, args: {} }
+  - do: { page: desktop_search, action: search, args: { keyword: "APW-SRCH-CASE1" } }
+  - assert: { type: visible, page: desktop_search, target: result_group }
+  - assert: { type: text_contains, page: desktop_search, target: results, expected: "APW-SRCH-CASE1" }
+  # ---- 3) 打开搜到的会话（面板收起 = 已切入会话）----
+  - do: { page: desktop_search, action: open_first_result, args: {} }
+  - assert: { type: visible, page: desktop_chat, target: user_message }
+  - assert: { type: text_contains, page: desktop_chat, target: user_message, expected: "APW-SRCH-CASE1" }
+  # ---- 4) 继续下一轮对话 ----
+  - do: { page: desktop_chat, action: send_message, args: { text: "继续，请分步推理后回答：128 是质数吗？" } }
+  - do: { page: desktop_chat, action: wait_reply_done, args: { timeout_ms: 120000 } }
+  - assert: { type: visible, page: desktop_chat, target: assistant_reply }
+  - assert: { type: visible, page: desktop_chat, target: reply_actions }
+  - judge: { note: "v1 预留：回复内容质量由 LLM-as-Judge 判定" }

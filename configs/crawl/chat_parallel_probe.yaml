@@ -1,7 +1,7 @@
 # 对话并行切换首轮探查配置（生成侧资产）：发现多会话的创建/列表/切换 UI 结构。
 # 探查期用 probe 保留名的通用原语推进状态；页面对象产品化后把 probe 步骤
 # 替换为 page: aml_chat 的动作（参考 configs/crawl/aml_chat.yaml）。
-# 产物落 .scratch/autoPlayWright/snapshots/<env>/（gitignored，落盘自动脱敏）。
+# 产物落 .scratch/auto_playwright/snapshots/<env>/（gitignored，落盘自动脱敏）。
 name: chat-parallel-probe
 targets:
   - id: chat-parallel

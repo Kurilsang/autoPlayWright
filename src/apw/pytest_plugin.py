@@ -5,6 +5,8 @@ flow 测试项与框架自测 fixtures 共用同一实例，session 结束统一
 """
 from __future__ import annotations
 
+import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -73,21 +75,24 @@ def get_runtime(config) -> ApwRuntime:
     from apw.locators.repo import LocatorRepo
     from apw.reporter.json_report import JsonReporter
 
-    env = load_env(config.getoption("--apw-env"))
+    # 资产路径（环境配置/定位器/报告/夹具 base_url）一律锚定仓库根，
+    # 不依赖调用时的 CWD（服务器上 cron/systemd/CI 从任意目录调用均一致）
+    root = Path(config.rootpath)
+    env = load_env(config.getoption("--apw-env"), config_dir=root / "configs/envs")
     # 调试开关（CLI）覆盖环境配置
     if config.getoption("--apw-headed"):
         env.driver.headless = False
     slow_mo = config.getoption("--apw-slowmo")
     if slow_mo:
         env.driver.slow_mo = slow_mo
-    driver = AppDriver(env=env)
+    driver = AppDriver(env=env, root=str(root))
     driver.start()
     rt = ApwRuntime(
         env=env,
         driver=driver,
-        repo=LocatorRepo.load(Path("locators")),
+        repo=LocatorRepo.load(root / "locators"),
         pages=default_registry(),
-        reporter=JsonReporter(config.getoption("--apw-reports-dir")),
+        reporter=JsonReporter(str(root / config.getoption("--apw-reports-dir"))),
     )
     config.stash[_RUNTIME_KEY] = rt
     return rt
@@ -130,6 +135,70 @@ def pytest_sessionfinish(session, exitstatus):
                 print(f"\n[apw] HTML 报告: {render_html(summary.parent)}")
             except Exception as exc:  # noqa: BLE001 - 渲染失败不影响测试结果
                 print(f"\n[apw] HTML 报告渲染失败: {exc}")
+            _maybe_notify(summary, session)
+
+
+def _maybe_notify(summary: Path, session=None) -> None:
+    """可选邮件通知，仅由环境变量控制（默认全关，通知失败不影响测试结果）：
+
+    - `APW_NOTIFY=always|on-fail`：发信策略；`on-change` 用 `APW_NOTIFY_PREV_FAILED`
+      传上一轮失败数（无基线则不发）
+    - `APW_NOTIFY_ATTACH=1`：附上 run 目录 zip（口径同 `apw.api` 的 report.zip）
+    - `APW_NOTIFY_ZIP_SANITIZE=1`：zip 内文本产物脱敏（外发邮件建议开）
+    """
+    policy = os.environ.get("APW_NOTIFY", "").strip().lower()
+    if policy not in ("always", "on-fail", "on-change"):
+        return
+    try:
+        from apw.notify import notify_from_summary
+
+        prev_raw = os.environ.get("APW_NOTIFY_PREV_FAILED", "").strip()
+        prev_failed = int(prev_raw) if prev_raw else None
+        if policy == "on-change":
+            from apw.notify import should_send
+
+            failed = json.loads(summary.read_text(encoding="utf-8")).get("failed", 0)
+            if not should_send(policy, int(failed), prev_failed):
+                print(f"\n[apw] 通知邮件: 未发送（policy={policy} 未命中）")
+                return
+            policy = "always"  # 策略已在上面判定，交给发送层直发
+        sent = notify_from_summary(
+            summary,
+            policy=policy,
+            report_zip=os.environ.get("APW_NOTIFY_ATTACH", "").strip() not in ("", "0"),
+            sanitize=os.environ.get("APW_NOTIFY_ZIP_SANITIZE", "").strip() not in ("", "0"),
+            env=_env_label(session),
+            targets=_target_labels(session),
+        )
+        state = "已发送" if sent else f"未发送（policy={policy} 未命中）"
+        print(f"\n[apw] 通知邮件: {state}")
+    except Exception as exc:  # noqa: BLE001 - 通知失败不影响测试结果
+        print(f"\n[apw] 通知邮件发送失败: {exc}")
+
+
+def _env_label(session) -> str:
+    if session is None:
+        return ""
+    try:
+        return str(session.config.getoption("--apw-env"))
+    except Exception:  # noqa: BLE001 - 非 pytest 调用场景
+        return ""
+
+
+def _target_labels(session) -> list[str]:
+    """本轮 pytest 目标（命令行的目录/文件），写进邮件正文便于一眼定位。"""
+    if session is None:
+        return []
+    try:
+        args: list[str] = []
+        for raw in session.config.invocation_params.args:
+            text = str(raw)
+            if text.startswith("-"):
+                break
+            args.append(text)
+        return args
+    except Exception:  # noqa: BLE001 - 非 pytest 调用场景
+        return []
 
 
 # ---------- fixtures（框架自测与 flow 项共用运行时） ----------

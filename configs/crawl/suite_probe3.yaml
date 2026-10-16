@@ -1,6 +1,6 @@
 # 套组广场第 3 轮探查（生成侧资产）：发布设置的可见性控件 + 简易模式表单结构。
 # 只看结构不提交（点取消收场）。术语映射：用户口径「普通模式」= 产品「简易模式」。
-# 产物落 .scratch/autoPlayWright/snapshots/<env>/（gitignored，落盘自动脱敏）。
+# 产物落 .scratch/auto_playwright/snapshots/<env>/（gitignored，落盘自动脱敏）。
 name: suite-probe3
 targets:
   - id: suite-publish-and-simple

@@ -1,0 +1,24 @@
+# 桌面客户端工作流 AI 探查：清场（关 Wiki 设置遮罩等）+ 状态确认。
+# 产物入 .scratch/auto_playwright/snapshots/desktop/（gitignored，落盘自动脱敏）。
+name: desktop-workflow-probe6-clear
+targets:
+  - id: desktop-wf-clear
+    route: ""
+    steps:
+      - do: { page: probe, action: press, args: { key: "Escape", optional: true } }
+        label: esc_1
+      - do: { page: probe, action: wait, args: { ms: 1000 } }
+        label: settle_1
+      - do: { page: probe, action: press, args: { key: "Escape", optional: true } }
+        label: esc_2
+      - do: { page: probe, action: wait, args: { ms: 1000 } }
+        label: settle_2
+      - do: { page: probe, action: dump_dom, args: { name: "wf6_after_esc" } }
+        label: dom_after_esc
+    signals:
+      - name: overlay_present
+        selector: { by: css, value: "div.workspace-overlay" }
+      - name: sidebar_present
+        selector: { by: css, value: "nav.sidebar-nav" }
+      - name: wf_list_present
+        selector: { by: css, value: "div.wf-list" }

@@ -1,0 +1,43 @@
+# 桌面端工作流 AI 并行切换用例：双工作流并行 AI 生成，来回切换逐工作流身份核对。
+# 探查事实（2026-10-12）：AI 生成是后台任务，view slot 切走/替换不中断；
+# 会话按工作流各归各，需求回显气泡是确定性身份锚点，对方标记零混入。
+# 断言全部为确定性内容（需求回显/组件渲染），AI 产出措辞只进证据；串台/卡死判 fail 冻结取证。
+meta:
+  id: desktop-workflow-ai-concurrent-switch
+  name: 桌面端工作流：并行 AI 生成并来回切换身份核对
+  platforms: [desktop]
+  envs: [desktop]
+  tags: [P0, workflow, ai-coding, concurrent]
+  owner: qa
+steps:
+  - do: { page: desktop_workflow, action: open_section, args: {} }
+  # ---- 工作流 A：新建 → AI 编写发需求甲（生成后台跑，发完即走）----
+  - do: { page: desktop_workflow, action: new_workflow, args: { name: "apw-desktop-ai-a" } }
+  - do: { page: desktop_workflow, action: open_ai_panel, args: {} }
+  - do: { page: desktop_workflow, action: send_ai_prompt, args: { prompt: "生成一个工作流：用纯脚本分步打印 甲甲甲-ai-alpha 并输出结果" } }
+  # ---- 工作流 B：A 未完成即切走建 B 发需求乙（双生成并行）----
+  - do: { page: desktop_workflow, action: back_to_list, args: {} }
+  - do: { page: desktop_workflow, action: new_workflow, args: { name: "apw-desktop-ai-b" } }
+  - do: { page: desktop_workflow, action: open_ai_panel, args: {} }
+  - do: { page: desktop_workflow, action: send_ai_prompt, args: { prompt: "生成一个工作流：用纯脚本分步打印 乙乙乙-ai-beta 并输出结果" } }
+  # ---- 切回 A：身份核对（串台判 fail 取证）→ 等 A 生成完成 ----
+  - do: { page: desktop_workflow, action: switch_workflow, args: { name: "apw-desktop-ai-a", forbid_text: "乙乙乙-ai-beta", timeout_ms: 30000 } }
+  - do: { page: desktop_workflow, action: open_ai_panel, args: {} }
+  - assert: { type: text_contains, page: desktop_workflow, target: ai_user_message, expected: "甲甲甲-ai-alpha" }
+  - do: { page: desktop_workflow, action: wait_gen_done, args: { timeout_ms: 180000 } }
+  - do: { page: desktop_workflow, action: capture_context, args: {} }
+  - assert: { type: visible, page: desktop_workflow, target: ai_assistant_message }
+  - assert: { type: visible, page: desktop_workflow, target: flow_node }
+  # ---- 切到 B：身份核对 → 等 B 生成完成 ----
+  - do: { page: desktop_workflow, action: switch_workflow, args: { name: "apw-desktop-ai-b", forbid_text: "甲甲甲-ai-alpha", timeout_ms: 30000 } }
+  - do: { page: desktop_workflow, action: open_ai_panel, args: {} }
+  - assert: { type: text_contains, page: desktop_workflow, target: ai_user_message, expected: "乙乙乙-ai-beta" }
+  - do: { page: desktop_workflow, action: wait_gen_done, args: { timeout_ms: 180000 } }
+  - do: { page: desktop_workflow, action: capture_context, args: {} }
+  - assert: { type: visible, page: desktop_workflow, target: ai_assistant_message }
+  - assert: { type: visible, page: desktop_workflow, target: flow_node }
+  # ---- 再切回 A：交叉切换复核（会话不丢、不串台）----
+  - do: { page: desktop_workflow, action: switch_workflow, args: { name: "apw-desktop-ai-a", forbid_text: "乙乙乙-ai-beta", timeout_ms: 30000 } }
+  - do: { page: desktop_workflow, action: open_ai_panel, args: {} }
+  - assert: { type: text_contains, page: desktop_workflow, target: ai_user_message, expected: "甲甲甲-ai-alpha" }
+  - judge: { note: "v1 预留：生成脚本质量由 LLM-as-Judge 判定" }

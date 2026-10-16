@@ -1,0 +1,13 @@
+# 桌面客户端当前态操作（探查辅助）：点「← 返回」验证可点性并 dump。
+name: desktop-workflow-probe-state2
+targets:
+  - id: desktop-wf-state2
+    route: ""
+    steps:
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "div.wf-view-slot.is-active button:text-is('← 返回')" }, timeout_ms: 8000, settle_ms: 1200 } }
+        label: back_clicked
+      - do: { page: probe, action: dump_dom, args: { name: "wf_state2" } }
+        label: dom_state2
+    signals:
+      - name: list_active
+        selector: { by: css, value: "div.wf-view-slot.is-active div.wf-list" }

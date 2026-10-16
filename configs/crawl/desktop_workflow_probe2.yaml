@@ -1,0 +1,77 @@
+# 桌面客户端工作流链路第二轮探查（生成侧资产）：建工作流进编辑器，
+# 采集 编辑器 → 编辑态 → 保存 → 运行中 → 运行完成 各状态结构（定位器/完成信号候选）。
+# 产物入 .scratch/auto_playwright/snapshots/desktop/（gitignored，落盘自动脱敏）。
+name: desktop-workflow-probe2
+targets:
+  - id: desktop-wf-editor-run
+    route: ""
+    steps:
+      - do: { page: probe, action: press, args: { key: "Escape", optional: true } }
+        label: dismiss_leftover_dialog
+      - do: { page: probe, action: wait, args: { ms: 1500 } }
+        label: ready
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "div.integration-toast button[aria-label='关闭']" }, optional: true, timeout_ms: 3000 } }
+        label: toast_dismissed
+      - do: { page: probe, action: click, args: { selector: { by: text, value: 工作流, exact: true }, timeout_ms: 5000 } }
+        label: nav_workflow
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "button.btn-primary.wf-btn:text-is('新建工作流')" }, timeout_ms: 5000 } }
+        label: new_dialog
+        capture: true
+      - do: { page: probe, action: type, args: { selector: { by: placeholder, value: "例如：周报汇总" }, text: "apw-desktop-probe2", timeout_ms: 5000 } }
+        label: name_typed
+        capture: true
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "div.integration-toast button[aria-label='关闭']" }, optional: true, timeout_ms: 2000 } }
+        label: toast_dismissed_2
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "footer.wf-modal-footer button.btn-primary" }, timeout_ms: 5000 } }
+        label: created
+      - do: { page: probe, action: wait, args: { ms: 3000 } }
+        label: editor_state
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "wf2_editor" } }
+        label: dom_editor
+      - do: { page: probe, action: click, args: { selector: { by: text, value: 编辑 }, optional: true, timeout_ms: 5000 } }
+        label: edit_mode
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "wf2_edit_mode" } }
+        label: dom_edit_mode
+      - do: { page: probe, action: insert, args: { selector: { by: css, value: "textarea[spellcheck='false']" }, text: "def main(wf):\n    with wf.step(\"n1\", \"打印 hello\"):\n        wf.log(\"hello\")\n        wf.set_output(\"greeting\", \"hello\")\n", optional: true, timeout_ms: 5000 } }
+        label: script_typed
+        capture: true
+      - do: { page: probe, action: click, args: { selector: { by: text, value: 保存工作流 }, optional: true, timeout_ms: 5000 } }
+        label: saved
+      - do: { page: probe, action: wait, args: { ms: 2000 } }
+        label: saved_state
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "wf2_saved" } }
+        label: dom_saved
+      - do: { page: probe, action: click, args: { selector: { by: role, value: button, name: 运行 }, optional: true, timeout_ms: 5000 } }
+        label: run_started
+      - do: { page: probe, action: wait, args: { ms: 3000 } }
+        label: running_state
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "wf2_running" } }
+        label: dom_running
+      - do: { page: probe, action: wait, args: { ms: 30000 } }
+        label: run_done_state
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "wf2_run_done" } }
+        label: dom_run_done
+    signals:
+      - name: wf_title_input
+        selector: { by: css, value: "input.font-semibold" }
+      - name: code_edit_toggle
+        selector: { by: text, value: 编辑 }
+      - name: save_button
+        selector: { by: text, value: 保存工作流 }
+      - name: saved_badge
+        selector: { by: text, value: 已保存 }
+      - name: script_empty_marker
+        selector: { by: text, value: 暂无脚本, exact: false }
+      - name: run_button
+        selector: { by: role, value: button, name: 运行 }
+      - name: cancel_run_button
+        selector: { by: text, value: 取消运行 }
+      - name: run_done_marker
+        selector: { by: text, value: 工作流完成, exact: false }
+      - name: gen_running_marker
+        selector: { by: text, value: AI 正在生成工作流, exact: false }

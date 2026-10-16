@@ -1,6 +1,6 @@
 # Skills 广场第 2 轮探查（生成侧资产）：上传表单结构 / 筛选标签 / 预览弹层 / 我的页签。
 # 只看结构不做副作用动作（不提交上传、不点下载）；「取消/关闭」把弹层收掉再进下一状态。
-# 产物落 .scratch/autoPlayWright/snapshots/<env>/（gitignored，落盘自动脱敏）。
+# 产物落 .scratch/auto_playwright/snapshots/<env>/（gitignored，落盘自动脱敏）。
 name: skill-probe2
 targets:
   - id: skill-surfaces

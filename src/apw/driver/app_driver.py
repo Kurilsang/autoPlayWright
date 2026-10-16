@@ -60,6 +60,8 @@ class AppDriver:
             "headless": self.env.driver.headless,
             "slow_mo": self.env.driver.slow_mo,
         }
+        if self.env.driver.args:
+            launch_kwargs["args"] = self.env.driver.args
         if self.env.driver.channel:
             launch_kwargs["channel"] = self.env.driver.channel
         self._browser = self._pw.chromium.launch(**launch_kwargs)

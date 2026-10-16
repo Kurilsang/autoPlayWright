@@ -1,0 +1,17 @@
+# 桌面客户端当前态快照（探查辅助）：dump 当前 DOM 看 view slot/返回钮状态。
+name: desktop-workflow-probe-state
+targets:
+  - id: desktop-wf-state
+    route: ""
+    steps:
+      - do: { page: probe, action: dump_dom, args: { name: "wf_state" } }
+        label: dom_state
+    signals:
+      - name: list_active
+        selector: { by: css, value: "div.wf-view-slot.is-active div.wf-list" }
+      - name: back_button
+        selector: { by: css, value: "div.wf-view-slot.is-active button:text-is('← 返回')" }
+      - name: back_any
+        selector: { by: text, value: 返回, exact: false }
+      - name: ai_panel
+        selector: { by: css, value: "aside.wf-author" }

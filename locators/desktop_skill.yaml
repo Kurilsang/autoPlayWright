@@ -1,0 +1,162 @@
+# 桌面客户端（Electron）技能页 / 技能市场定位器（CDP attach 探查 2026-10-12，<product> 0.2.2）。
+# 探查事实：
+#   侧栏入口 = button.sidebar-nav-item（文本「技能」）；主区容器 = div.skills-panel；
+#   页签 = button.skills-tab（「本地技能」默认 / 「技能市场」），激活态加 .active；
+#   市场 = div.skills-market（搜索框 input.skills-search / 刷新按钮 / 计数 div.skills-market-count
+#          「技能市场 · N[ · 已安装 M]」/ ul.skills-list > li.skill-card）；
+#   卡片 = li.skill-card：span.skill-card-name / span.skill-card-badge（official|user）
+#          / p.skill-card-desc / div.skill-card-meta > span.skill-card-meta-code
+#          / div.skill-card-actions > button.skill-card-action（详情=btn-ghost / 安装=btn-primary；
+#            已安装时安装键变 .is-installed 且 disabled，文案「已安装」）；
+#   本地 = div.skills-local（计数 div.skills-local-count「本地技能 · N」/ 空态 div.skills-empty-box
+#          > p.skills-empty-title「还没有安装任何技能」+ button.btn-primary「去技能市场看看」）；
+#   ⚠ 本地卡片有「上传到广场」按钮（=公开提交审核，硬红线）；用例绝不点击。
+#   详情 = div.skills-drawer-backdrop > aside.skills-drawer（标题 h3 / 文件树 ul.skills-file-tree /
+#          内容 div.skills-drawer-content / 关闭键 = header 内 button.btn-ghost「返回」；Esc 无效）。
+# 真实应用无 data-testid；候选按「结构类名 > 语义 aria/placeholder > 文本」排列。
+page: desktop_skill
+locators:
+  # ---- 入口与容器 ----
+  - name: nav_skill_button
+    source: manual
+    candidates:
+      - { by: css, value: "button.sidebar-nav-item:has-text('技能')" }
+      - { by: role, value: "button", name: "技能", exact: true }
+  - name: panel
+    source: manual
+    candidates:
+      - { by: css, value: "div.skills-panel" }
+  - name: panel_title
+    source: manual
+    candidates:
+      - { by: css, value: "div.skills-panel .skills-panel-title" }
+  # ---- 页签 ----
+  - name: tabs
+    source: manual
+    candidates:
+      - { by: css, value: "div.skills-tabs" }
+  - name: tab_local
+    source: manual
+    candidates:
+      - { by: css, value: "button.skills-tab:has-text('本地技能')" }
+  - name: tab_market
+    source: manual
+    candidates:
+      - { by: css, value: "button.skills-tab:has-text('技能市场')" }
+  - name: tab_active
+    source: manual
+    candidates:
+      # 当前激活页签（激活态 .active）；读取其文本作页签切换的确定性判据
+      - { by: css, value: "button.skills-tab.active" }
+  - name: import_button
+    source: manual
+    candidates:
+      - { by: css, value: "button.skills-import-btn" }
+  # ---- 技能市场 ----
+  - name: market
+    source: manual
+    candidates:
+      - { by: css, value: "div.skills-market" }
+  - name: market_search_input
+    source: manual
+    candidates:
+      - { by: css, value: "div.skills-market input.skills-search" }
+      - { by: placeholder, value: "搜索技能名称 / 描述…" }
+  - name: market_refresh_button
+    source: manual
+    candidates:
+      - { by: css, value: "div.skills-market button.btn-ghost" }
+  - name: market_count
+    source: manual
+    candidates:
+      # 计数文案「技能市场 · N[ · 已安装 M]」——text_contains 断言挂它（唯一元素）
+      - { by: css, value: "div.skills-market-count" }
+  - name: market_list
+    source: manual
+    candidates:
+      - { by: css, value: "div.skills-market ul.skills-list" }
+  # ---- 卡片（市场/本地共用卡壳）----
+  - name: skill_card
+    source: manual
+    candidates:
+      - { by: css, value: "li.skill-card" }
+  - name: card_name
+    source: manual
+    candidates:
+      - { by: css, value: "span.skill-card-name" }
+  - name: card_badge
+    source: manual
+    candidates:
+      - { by: css, value: "span.skill-card-badge" }
+  - name: card_desc
+    source: manual
+    candidates:
+      - { by: css, value: "p.skill-card-desc" }
+  - name: card_action_install
+    source: manual
+    candidates:
+      # 市场卡的「安装」键（已安装时同键变 .is-installed + disabled，文案「已安装」）
+      - { by: css, value: "div.skills-market li.skill-card button.btn-primary.skill-card-action" }
+  - name: card_action_installed
+    source: manual
+    candidates:
+      - { by: css, value: "div.skills-market li.skill-card button.skill-card-action.is-installed" }
+  - name: card_action_detail
+    source: manual
+    candidates:
+      # 市场卡的「详情」键（btn-ghost）
+      - { by: css, value: "div.skills-market li.skill-card button.btn-ghost.skill-card-action" }
+  # ---- 本地技能页签 ----
+  - name: local
+    source: manual
+    candidates:
+      - { by: css, value: "div.skills-local" }
+  - name: local_count
+    source: manual
+    candidates:
+      # 计数文案「本地技能 · N」
+      - { by: css, value: "div.skills-local-count" }
+  - name: local_empty_title
+    source: manual
+    candidates:
+      - { by: css, value: "div.skills-local p.skills-empty-title" }
+  - name: local_go_market_button
+    source: manual
+    candidates:
+      - { by: css, value: "div.skills-local button.btn-primary" }
+      - { by: text, value: "去技能市场看看" }
+  - name: local_market_button
+    source: manual
+    candidates:
+      # ⚠ 本地卡「上传到广场」= 公开提交审核（硬红线，用例绝不点击）；此处仅用于取证排除
+      - { by: css, value: "div.skills-local li.skill-card button.skill-card-action:has-text('上传到广场')" }
+  # ---- 详情抽屉 ----
+  - name: drawer_backdrop
+    source: manual
+    candidates:
+      - { by: css, value: "div.skills-drawer-backdrop" }
+  - name: drawer
+    source: manual
+    candidates:
+      - { by: css, value: "aside.skills-drawer" }
+  - name: drawer_title
+    source: manual
+    candidates:
+      - { by: css, value: "aside.skills-drawer .skills-drawer-title h3" }
+  - name: drawer_back_button
+    source: manual
+    candidates:
+      # 关闭键 = 抽屉头部「返回」（Esc 无效是产品实现）
+      - { by: css, value: "aside.skills-drawer .skills-drawer-header button.btn-ghost" }
+  - name: drawer_file_tree
+    source: manual
+    candidates:
+      - { by: css, value: "aside.skills-drawer ul.skills-file-tree" }
+  - name: drawer_file_item
+    source: manual
+    candidates:
+      - { by: css, value: "aside.skills-drawer ul.skills-file-tree li button" }
+  - name: drawer_content
+    source: manual
+    candidates:
+      - { by: css, value: "aside.skills-drawer div.skills-drawer-content" }

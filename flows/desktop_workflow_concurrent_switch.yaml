@@ -1,0 +1,66 @@
+# 桌面端工作流并行切换用例：双工作流并行运行，来回切换逐工作流身份核对。
+# 复用对话并行切换的「逐会话身份核对」模式改为工作流维度；串台/卡死判 fail 冻结取证。
+# 切换语义（探查事实 2026-10-12）：运行后台执行、视图切走不中断（卡片「进行中」在场）；
+# 切换 = 弹回列表 + 目标卡片「打开」（详情槽复用），身份锚点 = 详情标题 + 脚本节点 + 运行日志「工作流开始：<名>」。
+# 断言全部为确定性内容（身份回显/组件渲染/完成标记），不断言 LLM 措辞。
+# 脚本 sleep 时长保证双运行重叠窗口（A 60s / B 45s）。
+meta:
+  id: desktop-workflow-concurrent-switch
+  name: 桌面端工作流并行切换：双工作流并行运行并来回切换身份核对
+  platforms: [desktop]
+  envs: [desktop]
+  tags: [P0, workflow, concurrent]
+  owner: qa
+steps:
+  - do: { page: desktop_workflow, action: open_section, args: {} }
+  # ---- 工作流 A：新建 → 写脚本甲 → 保存 → 打开运行视图 → 启动（后台跑）----
+  - do: { page: desktop_workflow, action: new_workflow, args: { name: "apw-desktop-switch-a" } }
+  - do:
+      page: desktop_workflow
+      action: type_script
+      args:
+        script: |
+          def main(wf):
+              import time
+              with wf.step("n1", "甲甲甲步骤"):
+                  time.sleep(60)
+                  wf.log("alpha-done-甲甲甲")
+  - assert: { type: visible, page: desktop_workflow, target: flow_node_alpha }
+  - do: { page: desktop_workflow, action: open_run_view, args: {} }
+  - do: { page: desktop_workflow, action: start_run, args: {} }
+  # ---- 工作流 B：A 未完成即回列表新建 B 并跑（双工作流并行运行中）----
+  - do: { page: desktop_workflow, action: back_to_list, args: {} }
+  # A 后台运行在跑（卡片「进行中」/「最近运行：运行中」）= 并行运行证据
+  - assert: { type: visible, page: desktop_workflow, target: wf_card_running_badge }
+  - do: { page: desktop_workflow, action: new_workflow, args: { name: "apw-desktop-switch-b" } }
+  - do:
+      page: desktop_workflow
+      action: type_script
+      args:
+        script: |
+          def main(wf):
+              import time
+              with wf.step("n1", "乙乙乙步骤"):
+                  time.sleep(45)
+                  wf.log("beta-done-乙乙乙")
+  - assert: { type: visible, page: desktop_workflow, target: flow_node_beta }
+  - do: { page: desktop_workflow, action: open_run_view, args: {} }
+  - do: { page: desktop_workflow, action: start_run, args: {} }
+  # ---- 切回 A：身份核对（串台判 fail 取证）→ 等 A 运行完成 ----
+  - do: { page: desktop_workflow, action: switch_workflow, args: { name: "apw-desktop-switch-a", expect_text: "甲甲甲", forbid_text: "apw-desktop-switch-b", timeout_ms: 30000 } }
+  - do: { page: desktop_workflow, action: open_run_view, args: {} }
+  - do: { page: desktop_workflow, action: wait_run_done, args: { timeout_ms: 180000 } }
+  - do: { page: desktop_workflow, action: capture_context, args: {} }
+  - assert: { type: text_contains, page: desktop_workflow, target: run_started_name_line, expected: "apw-desktop-switch-a" }
+  - assert: { type: visible, page: desktop_workflow, target: run_done_marker }
+  # ---- 切到 B：身份核对 → 等 B 运行完成 ----
+  - do: { page: desktop_workflow, action: switch_workflow, args: { name: "apw-desktop-switch-b", expect_text: "乙乙乙", forbid_text: "apw-desktop-switch-a", timeout_ms: 30000 } }
+  - do: { page: desktop_workflow, action: open_run_view, args: {} }
+  - do: { page: desktop_workflow, action: wait_run_done, args: { timeout_ms: 180000 } }
+  - do: { page: desktop_workflow, action: capture_context, args: {} }
+  - assert: { type: text_contains, page: desktop_workflow, target: run_started_name_line, expected: "apw-desktop-switch-b" }
+  - assert: { type: visible, page: desktop_workflow, target: run_done_marker }
+  # ---- 再切回 A：交叉切换复核（上下文不丢、不串台）----
+  - do: { page: desktop_workflow, action: switch_workflow, args: { name: "apw-desktop-switch-a", expect_text: "甲甲甲", forbid_text: "apw-desktop-switch-b", timeout_ms: 30000 } }
+  - assert: { type: visible, page: desktop_workflow, target: flow_node_alpha }
+  - judge: { note: "v1 预留：运行产物质量由 LLM-as-Judge 判定" }

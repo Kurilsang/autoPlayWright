@@ -1,0 +1,43 @@
+# 桌面客户端链路③：技能页 / 技能市场 —— 浏览·搜索过滤·详情抽屉·安装并回显本地。
+# （Zepeng 待补用例：客户端桌面端「技能市场」链路，比对话/搜索链路复杂）
+# 断言全部为确定性内容（组件渲染/计数与列表一致/过滤收敛/抽屉回显/本地回显），不断言 LLM 措辞。
+# 自包含说明：搜索关键词取「市场首卡名」自身，不依赖任何固定技能名；安装为幂等动作
+# （已安装则跳过），因此可在同一客户端反复跑。
+# ⛔ 硬红线：本地卡「上传到广场」= 公开提交审核，本用例绝不点击（仅详情/安装/卸载可见范围内操作）。
+meta:
+  id: desktop-skill-market
+  name: 桌面端：技能市场 —— 浏览/搜索过滤/详情抽屉/安装并回显本地
+  platforms: [desktop]
+  envs: [desktop]
+  tags: [P0, skill, market]
+  owner: qa
+steps:
+  # ---- 0) 前置清理：收起上次可能遗留的详情抽屉（遮罩会挡住侧栏/卡片点击）----
+  - do: { page: desktop_skill, action: dismiss_drawer, args: {} }
+  # ---- 1) 侧栏进入技能页，默认停在「本地技能」页签，记录本地基线 ----
+  - do: { page: desktop_skill, action: open_panel, args: {} }
+  - assert: { type: visible, page: desktop_skill, target: tabs }
+  - do: { page: desktop_skill, action: open_tab, args: { tab: "local" } }
+  - do: { page: desktop_skill, action: local_snapshot, args: {} }
+  # ---- 2) 技能市场：计数文案与已渲染卡片数一致（内部自检）+ 卡片在场 ----
+  - do: { page: desktop_skill, action: open_tab, args: { tab: "market" } }
+  - do: { page: desktop_skill, action: market_snapshot, args: {} }
+  - assert: { type: text_contains, page: desktop_skill, target: market_count, expected: "技能市场" }
+  - assert: { type: visible, page: desktop_skill, target: skill_card }
+  # ---- 3) 搜索过滤：按首卡名收敛（目标卡仍在、总数下降）→ 清空复原 ----
+  - do: { page: desktop_skill, action: filter_by_first_card, args: {} }
+  - assert: { type: visible, page: desktop_skill, target: skill_card }
+  - do: { page: desktop_skill, action: restore_search, args: {} }
+  # ---- 4) 详情抽屉：打开（标题回显 + 文件树非空）→ 「返回」关闭（Esc 不关是产品实现）----
+  - do: { page: desktop_skill, action: open_detail, args: { index: 0 } }
+  - assert: { type: visible, page: desktop_skill, target: drawer }
+  - assert: { type: visible, page: desktop_skill, target: drawer_file_tree }
+  - do: { page: desktop_skill, action: close_detail, args: {} }
+  - assert: { type: visible, page: desktop_skill, target: market_list }
+  # ---- 5) 安装（幂等）：首卡进入已安装态 → 切本地技能页签回显该技能 ----
+  - do: { page: desktop_skill, action: ensure_installed, args: { index: 0 } }
+  - do: { page: desktop_skill, action: open_tab, args: { tab: "local" } }
+  - do: { page: desktop_skill, action: local_snapshot, args: {} }
+  - assert: { type: text_contains, page: desktop_skill, target: local_count, expected: "本地技能" }
+  - assert: { type: visible, page: desktop_skill, target: skill_card }
+  - judge: { note: "v1 预留：技能内容质量由 LLM-as-Judge 判定" }

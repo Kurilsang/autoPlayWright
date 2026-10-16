@@ -29,7 +29,7 @@ def main() -> int:
         "--config", action="append", required=True, help="爬取配置 YAML，可多次指定"
     )
     parser.add_argument(
-        "--out", default=".scratch/autoPlayWright/snapshots", help="快照输出目录"
+        "--out", default=".scratch/auto_playwright/snapshots", help="快照输出目录"
     )
     parser.add_argument("--headed", action="store_true", help="浏览器窗口可见（调试）")
     parser.add_argument("--slowmo", type=int, default=0, metavar="MS", help="动作放慢毫秒")

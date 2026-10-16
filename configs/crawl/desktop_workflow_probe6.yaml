@@ -1,0 +1,49 @@
+# 桌面客户端工作流「AI 编写」首轮探查（生成侧资产）：进详情 → 开 AI 编写面板 →
+# 采集面板结构（prompt 输入/提交钮/状态标记候选）。多假设 optional 试错。
+# 产物入 .scratch/auto_playwright/snapshots/desktop/（gitignored，落盘自动脱敏）。
+name: desktop-workflow-probe6
+targets:
+  - id: desktop-wf-ai-panel
+    route: ""
+    steps:
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "div.integration-toast button[aria-label='关闭']" }, optional: true, timeout_ms: 2000 } }
+        label: toast_dismissed
+      - do: { page: probe, action: dump_dom, args: { name: "wf6_overlay" } }
+        label: dom_overlay
+      # 弹回列表（optional ×2 兼容当前槽深：列表态未命中即跳过）
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "div.wf-view-slot.is-active button:text-is('← 返回')" }, optional: true, timeout_ms: 1500 } }
+        label: back_1
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "div.wf-view-slot.is-active button:text-is('← 返回')" }, optional: true, timeout_ms: 1500 } }
+        label: back_2
+      # 侧边栏进工作流面板（已在面板时幂等回到列表）
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "nav.sidebar-nav button.sidebar-nav-item:has(.sidebar-nav-label:text-is('工作流'))" }, timeout_ms: 5000 } }
+        label: nav_workflow
+      - do: { page: probe, action: wait, args: { ms: 1500 } }
+        label: list_ready
+        capture: true
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "button.btn-primary.wf-btn:text-is('新建工作流')" }, timeout_ms: 5000 } }
+        label: new_dialog
+      - do: { page: probe, action: type, args: { selector: { by: placeholder, value: "例如：周报汇总" }, text: "apw-ai-probe", timeout_ms: 5000 } }
+        label: name_typed
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "div.integration-toast button[aria-label='关闭']" }, optional: true, timeout_ms: 2000 } }
+        label: toast_dismissed_2
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "footer.wf-modal-footer button.btn-primary" }, timeout_ms: 5000 } }
+        label: created
+      - do: { page: probe, action: wait, args: { ms: 2000 } }
+        label: detail_state
+        capture: true
+      # 「AI 编写」= 脚本面板头部的助手开关（title=让助手读取并改写当前工作流脚本）
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "div.wf-view-slot.is-active button:text-is('AI 编写')" }, timeout_ms: 5000 } }
+        label: ai_panel_opened
+      - do: { page: probe, action: wait, args: { ms: 1500 } }
+        label: ai_panel_state
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "wf6_ai_panel" } }
+        label: dom_ai_panel
+    signals:
+      - name: ai_toggle
+        selector: { by: css, value: "div.wf-view-slot.is-active button:text-is('AI 编写')" }
+      - name: ai_textarea
+        selector: { by: css, value: "div.wf-view-slot.is-active textarea" }
+      - name: prompt_placeholder
+        selector: { by: css, value: "div.wf-view-slot.is-active [placeholder]" }

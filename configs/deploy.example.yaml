@@ -1,0 +1,6 @@
+# 部署目标配置模板（真实值写入 configs/deploy.local.yaml，gitignored）。
+# 供 scripts/pack_release.py 读取；不配也能用 --target 显式指定。
+target: "Z:\\<deploy_dir>"                        # 开发机上的挂载盘路径（SMB 挂载点）
+remote_path: "/mnt/fileroot/<user>/<deploy_dir>"  # 服务器上的真实路径
+host: "<deploy_host>"                             # 部署机 IP / 主机名
+user: "<deploy_user>"                             # 部署机账号

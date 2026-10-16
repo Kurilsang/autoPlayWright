@@ -1,6 +1,8 @@
 """环境与驱动配置：configs/envs/<env>.yaml → EnvConfig。"""
 from __future__ import annotations
 
+import os
+import shlex
 from pathlib import Path
 from typing import Literal
 
@@ -43,6 +45,8 @@ class DriverConfig(BaseModel):
     channel: str = ""  # 例如 "msedge" 使用系统浏览器，空则用 Playwright 内置 chromium
     headless: bool = True
     slow_mo: int = 0  # 每个 Playwright 动作间的延迟 ms，调试放慢用
+    # chromium 启动参数透传（Linux 容器 root 需 --no-sandbox），亦可 APW_CHROMIUM_ARGS 追加
+    args: list[str] = Field(default_factory=list)
     electron: ElectronConfig = Field(default_factory=ElectronConfig)
 
 
@@ -58,7 +62,16 @@ def load_env(env: str, config_dir: str | Path = "configs/envs") -> EnvConfig:
     if not path.exists():
         raise FileNotFoundError(f"环境配置不存在: {path}")
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    return EnvConfig.model_validate({**data, "name": env})
+    cfg = EnvConfig.model_validate({**data, "name": env})
+    # 本地端口差异走环境变量覆盖（如默认调试端口被占用时换端口），入库配置保持默认口径
+    endpoint = os.environ.get("APW_CDP_ENDPOINT", "").strip()
+    if endpoint:
+        cfg.driver.electron.cdp_endpoint = endpoint
+    # 浏览器启动参数走环境变量追加（如 Linux 容器 root 跑需 --no-sandbox），shell 风格分词
+    extra_args = os.environ.get("APW_CHROMIUM_ARGS", "").strip()
+    if extra_args:
+        cfg.driver.args.extend(shlex.split(extra_args))
+    return cfg
 
 
 def resolve_base_url(env: EnvConfig, root: str | Path = ".") -> str:

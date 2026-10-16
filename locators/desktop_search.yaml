@@ -1,0 +1,51 @@
+# 桌面客户端搜索面板（Electron 打包 Web 界面，CDP attach 探查 2026-10-12）。
+# 探查事实：侧栏「搜索」= button.sidebar-nav-item（文本「搜索」）；
+# 面板 = div.search-panel，输入 = input.search-panel-input（placeholder「搜索对话、消息…」）；
+# 过滤页签 = button.search-panel-filter（全部/仅标题/用户消息/助手回复）；
+# 结果 = div.search-panel-results > div.search-result-group
+#   > button.search-result-conv（span.search-result-conv-title / span.search-result-conv-path）
+#   > button.search-result-hit.user|assistant（span.search-result-hit-role/-preview/-time）。
+# 真实应用无 data-testid；候选按「结构类名 > 语义 aria/placeholder > 文本」排列。
+page: desktop_search
+locators:
+  - name: nav_search_button
+    source: manual
+    candidates:
+      - { by: css, value: "button.sidebar-nav-item:has-text('搜索')" }
+      - { by: role, value: "button", name: "搜索", exact: true }
+  - name: panel
+    source: manual
+    candidates:
+      - { by: css, value: "div.search-panel" }
+  - name: search_input
+    source: manual
+    candidates:
+      - { by: css, value: "input.search-panel-input" }
+      - { by: placeholder, value: "搜索对话、消息…" }
+  - name: results
+    source: manual
+    candidates:
+      # 结果容器：text_contains 断言挂它（loc() 取 first，容器是唯一元素）
+      - { by: css, value: "div.search-panel-results" }
+  - name: result_group
+    source: manual
+    candidates:
+      - { by: css, value: "div.search-result-group" }
+  - name: result_conv
+    source: manual
+    candidates:
+      - { by: css, value: "button.search-result-conv" }
+  - name: result_conv_title
+    source: manual
+    candidates:
+      - { by: css, value: "span.search-result-conv-title" }
+  - name: result_hit
+    source: manual
+    candidates:
+      - { by: css, value: "button.search-result-hit" }
+  - name: empty_hint
+    source: manual
+    candidates:
+      # 空态提示（未输入关键词时）——面板已开但无结果的确定性标记
+      - { by: css, value: "p.search-panel-hint" }
+      - { by: text, value: "输入关键词，搜索历史对话与消息" }

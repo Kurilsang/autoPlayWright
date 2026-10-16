@@ -1,6 +1,6 @@
 # 桌面客户端工作流「AI 编写」首轮探查（生成侧资产）：进详情 → 开 AI 编写面板 →
 # 采集面板结构（prompt 输入/提交钮/状态标记候选）。多假设 optional 试错。
-# 产物入 .scratch/autoPlayWright/snapshots/desktop/（gitignored，落盘自动脱敏）。
+# 产物入 .scratch/auto_playwright/snapshots/desktop/（gitignored，落盘自动脱敏）。
 name: desktop-workflow-probe6
 targets:
   - id: desktop-wf-ai-panel

@@ -6,7 +6,7 @@
 邮件认证/租户策略问题全部归外部服务。
 
 - 实现：`src/apw/api.py`（标准库，零新增依赖）
-- 启动：`python -m apw.api --host 127.0.0.1 --port 18787`（Linux：`bash run_api.sh`）
+- 启动：`python -m apw.api --host 127.0.0.1 --port 18787`（Linux：`bash scripts/run_api.sh`）
 - 自测：`pytest tests/test_api.py`
 - **端口约定：默认 18787**（避开常见服务占用的 8787）
 
@@ -14,10 +14,10 @@
 
 ```bash
 # 本机自测（只绑 127.0.0.1，无需 token）
-bash run_api.sh
+bash scripts/run_api.sh
 
 # 跨机给外部服务调（必须配 token；端口按需改）
-nohup bash run_api.sh --host 0.0.0.0 --port 18787 > reports/api.log 2>&1 &
+nohup bash scripts/run_api.sh --host 0.0.0.0 --port 18787 > reports/api.log 2>&1 &
 
 # 验证活着（免鉴权）
 curl http://127.0.0.1:18787/health      # {"status": "ok", "runs": 0}

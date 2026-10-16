@@ -1,6 +1,6 @@
 # 套组广场第 5 轮探查（生成侧资产）：复现「创建套组」提交后的表单校验态
 # （用例实测提交未生效——找必填/校验提示）。不真正创建成功也无妨，仅看校验反馈。
-# 产物落 .scratch/autoPlayWright/snapshots/<env>/（gitignored，落盘自动脱敏）。
+# 产物落 .scratch/auto_playwright/snapshots/<env>/（gitignored，落盘自动脱敏）。
 name: suite-probe5
 targets:
   - id: suite-submit

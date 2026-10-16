@@ -1,7 +1,7 @@
 # 桌面客户端工作流链路第五轮探查（生成侧资产）：并行工作切换语义。
 # 假设待验证：运行任务在 view slot 销毁后仍后台执行（卡片最近运行徽标 / 重新进入运行视图可接力）；
 # 详情 slot 复用（开 B 替换 A 的详情）；切换 = 返回列表 + 目标卡片「打开」，身份核对看标题与运行日志锚点。
-# 产物入 .scratch/autoPlayWright/snapshots/desktop/（gitignored，落盘自动脱敏）。
+# 产物入 .scratch/auto_playwright/snapshots/desktop/（gitignored，落盘自动脱敏）。
 name: desktop-workflow-probe5
 targets:
   - id: desktop-wf-switch

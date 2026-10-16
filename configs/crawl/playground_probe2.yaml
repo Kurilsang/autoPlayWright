@@ -1,7 +1,7 @@
 # 操练场第 2 轮探查（生成侧资产）：「新建会话」弹窗——套组选择器 + 模式选择 + 确认按钮结构。
 # 链路目标：创建套组 → 操练场 → 选用刚创建的套组 → 简单对话调试。
 # 本轮只推进到弹窗内部结构与套组选中态，不做真实创建（确认按钮识别后下一轮走完整链）。
-# 产物落 .scratch/autoPlayWright/snapshots/<env>/（gitignored，落盘自动脱敏）。
+# 产物落 .scratch/auto_playwright/snapshots/<env>/（gitignored，落盘自动脱敏）。
 name: playground-probe2
 targets:
   - id: playground-new-session

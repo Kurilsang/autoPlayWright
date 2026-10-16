@@ -61,8 +61,12 @@ _THINKING_JS = """
 """
 
 
-def classify_incomplete(signals: dict) -> tuple[str, str]:
-    """归因「完整回答未达成」：(分类, 说明)。归因与复现线索随证据入报告。"""
+def classify_incomplete(signals: dict, require_thinking: bool = True) -> tuple[str, str]:
+    """归因「完整回答未达成」：(分类, 说明)。归因与复现线索随证据入报告。
+
+    require_thinking=False 时不把 Thought 块计入必备结构（见 wait_reply_done）：
+    归因文案也据此收敛，避免把「模型走工具快路径」误报成「半截渲染」。
+    """
     if not signals.get("user_echo", True):
         return (
             "send_stuck",
@@ -73,11 +77,10 @@ def classify_incomplete(signals: dict) -> tuple[str, str]:
             "streaming_stuck",
             "「停止生成」按钮仍在：生成未结束（服务端生成挂起或超长）",
         )
-    missing = [
-        k
-        for k in ("assistant_reply", "thinking", "reply_actions")
-        if not signals.get(k)
-    ]
+    required = ["assistant_reply", "reply_actions"]
+    if require_thinking:
+        required.insert(1, "thinking")
+    missing = [k for k in required if not signals.get(k)]
     if missing:
         return "reply_incomplete", f"回答结构不完整（半截渲染）：缺 {', '.join(missing)}"
     return "content_unstable", "回答内容持续变化未稳定（文本长度未收敛）"
@@ -108,17 +111,47 @@ class DesktopChatPage(BasePage):
             )
         return {"new_task": "cleared"}
 
-    def send_message(self, text: str, tag: str = "") -> dict:
+    def send_message(self, text: str, tag: str = "", landed_timeout_ms: int = 10_000) -> dict:
         """真实键入并 Enter 发送（产品约定：Enter 发送，Shift+Enter 换行）。
 
         组合器是 contenteditable 富输入，走真实键入（与工作流编辑器同陷阱）；
         发送后记录用户消息 data-message-id 作身份锚点（无会话 URL 可用）。
+
+        提交落列核对（实测 2026-10-13）：偶发「键入成功但 Enter 未提交」——
+        文本留在组合器、消息未落列，旧实现仍返回 passed，导致下一步
+        wait_reply_done 空等满超时（240s）才报 send_stuck，现场已被等待淹没。
+        故此处显式等 data-message-id 落列，未落列立即 fail_evidence 冻结现场
+        （失败即取证、不重试）。
         """
         self.loc("message_input").click()
         self.loc("message_input").type(text, delay=20)
         self.page.keyboard.press("Enter")
-        self.page.wait_for_timeout(1500)  # 等消息落列 + 生成启动
+
+        landed = self.wait_until(
+            lambda: bool(self.page.evaluate(_MSG_ID_JS)),
+            timeout_ms=landed_timeout_ms,
+            interval_ms=300,
+        )
         message_id = self.page.evaluate(_MSG_ID_JS)
+        if not landed or not message_id:
+            self.fail_evidence(
+                "消息未落列：输入未提交成功",
+                classification="send_stuck",
+                cause="点组合器键入并 Enter 后，用户消息未出现在会话区（无 data-message-id）",
+                repro={
+                    "url": self.page.url,
+                    "observed": (
+                        f"user_message 数={self.count('user_message')} "
+                        f"message_id={message_id!r}"
+                    ),
+                },
+                detail=(
+                    f"期望 Enter 后 {landed_timeout_ms}ms 内落列；"
+                    "可能原因：组合器未获焦点 / 提交链路异常 / 会话区被遮挡；页面原状冻结"
+                ),
+                shot_name="send-not-landed",
+                extra={"sent": text, "tag": tag},
+            )
         self.flow_state[tag or text] = message_id
         return {"sent": text, "message_tag": tag or text, "message_id": message_id}
 
@@ -176,19 +209,27 @@ class DesktopChatPage(BasePage):
             "body_chars": len(last.get("body_text") or ""),
         }
 
-    def wait_reply_done(self, timeout_ms: int = 120_000) -> None:
+    def wait_reply_done(self, timeout_ms: int = 120_000, require_thinking: bool = True) -> None:
         """等待「完整回答」生成结束（判定信号缺一不可，稳定采样收敛才算完成）：
 
         1. 用户消息在场：发送已落列（user_echo）
         2. 「停止生成」按钮消失（btn-stop 清除 = 流式结束的 UI 状态）
         3. 回答气泡在场：最终回答已渲染
-        4. Thought 折叠块在场：思考过程组件已渲染（产品口径恒在场；正文展开才渲染，
-           展开交互见 expand_thinking）
+        4. Thought 折叠块在场：思考过程组件已渲染（正文展开才渲染，展开交互见 expand_thinking）
         5. 完成态操作行在场（复制/从此处分叉/喜欢…，渲染完成才出现）
         6. 会话区文本长度连续 3 次采样不变（内容稳定）
 
         流式已结束且内容稳定 5 采样仍缺结构信号 = 半截渲染，立即判失败取证
         （不空等满超时）。未达成即判失败，绝不自愈重载（页面原状冻结）。
+
+        require_thinking=False：**不把 Thought 块当必备结构**（第 4 项降级为观察项）。
+        为什么需要这个开关（2026-10-14 实测，客户端 0.2.3）：模型偶发走「工具调用快路径」
+        ——服务端首输出直接是 `tool_call`、跳过 reasoning，前端据此**不渲染** Thought 块
+        （bundle 内为条件渲染：texts 为空即返回 null）。此时工具调用与最终回答都完整正确，
+        但硬性要求 Thought 在场会把正常轮次误判成 reply_incomplete。实测缺失率约 50%，
+        多轮链路几乎必挂。故凡「判定锚在工具调用流水账、不依赖思考过程」的链路
+        （如外部 MCP 接入）传 False；对话类链路保持默认 True 以继续守住该结构。
+        Thought 块**在场时**仍照常记录（capture_context / expand_thinking 不受影响）。
         """
         stall_shot = ""
 
@@ -203,6 +244,10 @@ class DesktopChatPage(BasePage):
             ):
                 stall_shot = self.snap("stall-onset")
 
+        gate = ["user_echo", "stop_cleared", "assistant_reply", "reply_actions"]
+        if require_thinking:
+            gate.append("thinking")
+
         watch = self.watch_signals(
             signals=lambda: {
                 "user_echo": self.count("user_message") > 0,
@@ -216,6 +261,7 @@ class DesktopChatPage(BasePage):
                 " return m ? (m.innerText || '').length : 0; }"
             ),
             timeout_ms=timeout_ms,
+            gate=gate,
             # 稳定计数只认「流式已结束」：结构信号长期缺失时由 give_up 提前收场
             stability_gate=lambda s: s.get("stop_cleared", False),
             on_tick=on_tick,
@@ -225,11 +271,12 @@ class DesktopChatPage(BasePage):
             return
         self.fail_incomplete(
             "完整回答未达成",
-            classify=classify_incomplete,
+            classify=lambda s: classify_incomplete(s, require_thinking=require_thinking),
             watch=watch,
             steps="new_task → send_message → wait_reply_done",
             observed=f"send_message 后 {timeout_ms}ms 内完整回答未达成",
             freeze_shots=[stall_shot],
+            extra={"require_thinking": require_thinking},
         )
 
     def capture_context(self) -> dict:

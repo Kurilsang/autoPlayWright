@@ -1,7 +1,7 @@
 # 桌面客户端工作流链路第四轮探查（生成侧资产）：
 # A) 慢脚本运行截「运行中」UI（完成判定信号候选）；
 # B) 连开两个工作流看 view slot 栈与「← 返回」切换语义（并行工作切换载体）。
-# 产物入 .scratch/autoPlayWright/snapshots/desktop/（gitignored，落盘自动脱敏）。
+# 产物入 .scratch/auto_playwright/snapshots/desktop/（gitignored，落盘自动脱敏）。
 name: desktop-workflow-probe4
 targets:
   - id: desktop-wf-slowrun-switch

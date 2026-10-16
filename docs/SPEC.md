@@ -1,8 +1,8 @@
-# SPEC：内部 Agent 产品 UI 自动化测试框架（autoPlayWright）
+# SPEC：内部 Agent 产品 UI 自动化测试框架（auto_playwright）
 
 > 状态：已采纳并部分实现（票 01 表单登录、票 02 tracer bullet 于 2026-09-22 交付；T07 预演产物已产品化，真实环境冒烟持续绿灯，2026-09-23；issue tracker 同步仍待定）
 > 来源：2026-09 需求探讨（grilling 决策记录见文末附录）
-> 当前进度以 `AGENTS.md` 与 `.scratch/autoPlayWright/issues/` 为准，本文件是规格与决策记录。
+> 当前进度以 `AGENTS.md` 与 `.scratch/auto_playwright/issues/` 为准，本文件是规格与决策记录。
 
 ## Problem Statement
 
@@ -77,7 +77,7 @@ steps:
 - 会话隔离：每条 flow 执行时新建会话，用例间无数据依赖。
 - 失败时自动留存 Playwright trace、截图，路径写入 StepEvent。
 - 失败即取证，禁止自愈（实现决策 2026-09-23）：卡死/半截渲染等 UI 缺陷本身就是被测对象，测试判 fail 并冻结现场——EvidenceError 携带归因分类（hang_loading / streaming_stuck / reply_incomplete / content_unstable / thinking_expand_failed）、复现信息（操作序 + 会话 URL + 观察窗口）、1s 粒度信号时间线、冻结截图与半截上下文，进入失败事件的 evidence。自动重载/重试把偶发缺陷跑绿属于假通过，不做。
-- 调试模式：`--apw-headed`（窗口可见）+ `--apw-slowmo MS`（动作放慢）CLI 覆盖环境配置；`run_debug.bat` 一键包装。
+- 调试模式：`--apw-headed`（窗口可见）+ `--apw-slowmo MS`（动作放慢）CLI 覆盖环境配置；`scripts/run_debug.bat` 一键包装。
 
 ### 技术栈
 
@@ -142,7 +142,7 @@ Python 3.11+、Playwright（同步 API）、pytest、pytest-xdist、allure-pytes
 | D12 | 工作区脚本生命周期 | 用完默认归档为生成器素材/快照基线（`.scratch/`）；升格 `scripts/` 长期资产需人工判定（2026-09-23） |
 | D13 | UI 判定主体 | CI 门禁只认确定性结构标记；AI 判定走 `judge` 步出参考意见，不挡门禁（2026-09-23） |
 | D14 | 生成器接入 | 先人在环后无人值守：生成侧以 opencode skill/命令为载体（prompt 资产沉淀为 skill），稳定后升级 CLI/SDK 流水线；**pi agent 不引入**（避免双生成方 prompt 漂移），未来确有需要再评估（2026-09-23） |
-| D15 | 草稿入库验收门 | 分期：v1 = schema 校验 + ruff + 真实环境绿跑 ≥3 次（防偶发卡死污染结论）；生成器稳定后加固定快照回放测试（票 07 验收项）（2026-09-23） |
+| D15 | 草稿入库验收门 | 分期：v1 = schema 校验 + ruff + 真实环境绿跑 **≥2 次**（防偶发卡死污染结论）；生成器稳定后加固定快照回放测试（票 07 验收项）（2026-09-23；**2026-10-13 门槛由 ≥3 调整为 ≥2**——链路单次成本高（桌面端 MCP 约 3.5 分钟、Web 端 AI 长任务更久），2 次已能暴露偶发；若 2 次中出现 flake，则临时加跑至连续 2 绿为止，不因门槛降低而放过偶发） |
 | D16 | 动作原语集 | 固定枚举起步：语义原语（含链路级完成判定/取证）+ 基础原语（元素级，动作成功=locator 状态）两档，共 8~12 个；裸 click/fill 不构成链路完成证据，仅用基础原语的 flow 必须以 assert 收口（schema 静态检查）；TODO 演进为开放注册制 + 评审（2026-09-23） |
 | D17 | Page 注册机制 | 保持静态注册（`default_registry()` 单点）；生成新页面类的 diff 连带注册行，人审可见（2026-09-23） |
 | D18 | 探索区工作区与快照骨架 | 工作区 `workspace/`（gitignored）跑 AI 临时脚本，产物归档 `.scratch/` 作生成器素材；快照 = 路由 + 语义化交互元素（含定位器候选）+ 完成信号在场性 + 截图引用 + **状态路径标注**（同页面多状态多份快照）（2026-09-23） |

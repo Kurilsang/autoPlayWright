@@ -6,7 +6,7 @@
 #
 # Python 需 3.11+，可指定解释器：PYTHON=python3.12 bash setup_linux.sh
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 
 PY="${PYTHON:-python3}"
 "$PY" -m venv .venv

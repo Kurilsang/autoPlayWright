@@ -1,7 +1,7 @@
 # 桌面客户端工作流「AI 编写」生成旅程探查（生成侧资产，自包含从启动态）：
 # 进工作流 → 新建 → 开 AI 编写面板 → 真发一条需求，采集
 # 提交 → 生成中 → 生成完成 各状态结构（消息/todo/脚本落盘/自动保存信号候选）。
-# 产物入 .scratch/autoPlayWright/snapshots/desktop/（gitignored，落盘自动脱敏）。
+# 产物入 .scratch/auto_playwright/snapshots/desktop/（gitignored，落盘自动脱敏）。
 name: desktop-workflow-probe7
 targets:
   - id: desktop-wf-ai-gen

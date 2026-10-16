@@ -1,6 +1,6 @@
 # 桌面客户端工作流链路首轮探查配置（生成侧资产）：找工作流入口 + 列表 + 新建 + 编辑器结构。
 # 探查期用 probe 保留名通用原语推进状态；定位器与页面对象产品化后步骤替换为 page: <页面名>。
-# 产物入 .scratch/autoPlayWright/snapshots/desktop/（gitignored，落盘自动脱敏）。
+# 产物入 .scratch/auto_playwright/snapshots/desktop/（gitignored，落盘自动脱敏）。
 # 注：桌面端 goto_base 不导航（客户端启动即在其 UI），目标自包含、多假设 optional 试错。
 name: desktop-workflow-probe
 targets:

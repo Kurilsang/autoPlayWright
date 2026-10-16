@@ -9,7 +9,7 @@
 # 容器 root 跑 Chromium 需要 --no-sandbox：
 #   APW_CHROMIUM_ARGS="--no-sandbox --disable-dev-shm-usage" bash run_flows.sh
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 export PYTHONIOENCODING=utf-8
 
 if [ ! -x ".venv/bin/pytest" ]; then

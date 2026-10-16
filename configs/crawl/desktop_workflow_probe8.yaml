@@ -1,7 +1,7 @@
 # 桌面客户端工作流「AI 编写」并行生成切换探查（生成侧资产）：
 # 假设待验证：AI 生成是后台任务，view slot 切走/替换不中断（同运行语义）；
 # 切回后各工作流的 AI 会话/生成态各归各（prompt 回显 + 对方标记零混入）。
-# 产物入 .scratch/autoPlayWright/snapshots/desktop/（gitignored，落盘自动脱敏）。
+# 产物入 .scratch/auto_playwright/snapshots/desktop/（gitignored，落盘自动脱敏）。
 name: desktop-workflow-probe8
 targets:
   - id: desktop-wf-ai-par

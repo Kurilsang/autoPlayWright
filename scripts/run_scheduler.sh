@@ -11,7 +11,7 @@
 # 常驻建议挂 tmux/systemd（service 示例见 README「定时执行」）；Ctrl+C / SIGTERM 优雅停。
 # 每轮输出落 reports/scheduler/run-<ts>.log；轮内运行的报告照常落 reports/<run_id>/。
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 export PYTHONIOENCODING=utf-8
 
 if [ ! -x ".venv/bin/python" ]; then

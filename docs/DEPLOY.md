@@ -40,7 +40,7 @@ cd <部署目录>
 tar -xzf apw-deploy-<日期>.tar.gz      # 解压覆盖（保留 .venv/reports/configs）
 
 # 首次部署才需要；已有 .venv 可跳过
-bash setup_linux.sh --with-deps
+bash scripts/setup_linux.sh --with-deps
 
 # 首次配置真实环境
 cp configs/envs/test.example.yaml configs/envs/test.yaml
@@ -50,23 +50,23 @@ cp configs/notify.example.yaml configs/secrets.local.yaml
 cp configs/notify.example.yaml configs/notify.local.yaml   # 只留 notify: 段填真实邮箱
 
 # 跑起来
-bash run_flows.sh
-bash run_and_mail.sh              # 一键：跑业务链路 + 发带附件的报告邮件
-bash run_scheduler.sh             # 定时执行（默认 30 分钟一轮；纯跑测不发信）
+bash scripts/run_flows.sh
+bash scripts/run_and_mail.sh              # 一键：跑业务链路 + 发带附件的报告邮件
+bash scripts/run_scheduler.sh             # 定时执行（默认 30 分钟一轮；纯跑测不发信）
 
 # 定时任务 + 自动发信、停止、冒烟（发信）的标准命令见下文「服务启停与冒烟」（每次部署交付必给）
 
 # 回归触发 API（外部服务调用；端口约定 18787）
-bash run_api.sh --host 0.0.0.0 --port 18787
+bash scripts/run_api.sh --host 0.0.0.0 --port 18787
 ```
 
-### 发报告邮件（`run_and_mail.sh` / `run_and_mail.bat`）
+### 发报告邮件（`scripts/run_and_mail.sh` / `scripts/run_and_mail.bat`）
 
 跑完 `flows` 后自动把本轮 run 目录打成 zip 附上，发摘要给配置里的收件人。
 
 - **收件人集中配置**：`configs/notify.local.yaml` 的 `notify:` 段（`report_to` 主收件人、`cc` 抄送）。
   改名单只动这个文件；优先级 `notify.local.yaml` < `APW_NOTIFY_TO` < `--to/--cc`
-- **一键脚本**：`bash run_and_mail.sh`（Linux）/ `run_and_mail.bat`（Windows）；
+- **一键脚本**：`bash scripts/run_and_mail.sh`（Linux）/ `scripts/run_and_mail.bat`（Windows）；
   `--no-mail` 只跑不发、`--env fixture` 换环境、其余参数透传 pytest
 - **只跑 flows**：`tests` 是框架自测，需要 `--apw-env fixture`，与真实环境混跑会出假红
 - **附件 = API 的 report.zip**：同一函数产物（`attach_run_zip` → `apw.api.build_report_zip`），
@@ -107,7 +107,7 @@ smtp:
 - **后台常驻**（推荐）：
 
   ```bash
-  nohup bash run_api.sh --host 0.0.0.0 --port 18787 > reports/api.log 2>&1 &
+  nohup bash scripts/run_api.sh --host 0.0.0.0 --port 18787 > reports/api.log 2>&1 &
   curl http://127.0.0.1:18787/health        # {"status": "ok", ...}
   ```
 
@@ -136,7 +136,7 @@ smtp:
 容器/root 跑 Chromium：
 
 ```bash
-APW_CHROMIUM_ARGS="--no-sandbox --disable-dev-shm-usage" bash run_flows.sh
+APW_CHROMIUM_ARGS="--no-sandbox --disable-dev-shm-usage" bash scripts/run_flows.sh
 ```
 
 ## 服务启停与冒烟（每次部署交付必给）
@@ -148,11 +148,11 @@ APW_CHROMIUM_ARGS="--no-sandbox --disable-dev-shm-usage" bash run_flows.sh
 
 ```bash
 # 启动 · 形态一（当前口径，cron 多档并集）：每天 21:00 + 每周五 18:00 各一轮
-APW_NOTIFY=always APW_NOTIFY_ATTACH=1 nohup bash run_scheduler.sh \
+APW_NOTIFY=always APW_NOTIFY_ATTACH=1 nohup bash scripts/run_scheduler.sh \
   --cron "0 21 * * *" --cron "0 18 * * 5" > reports/scheduler.log 2>&1 &
 
 # 启动 · 形态二（固定间隔）：每 30 分钟一轮（与 --cron 互斥，两种形态二选一）
-APW_NOTIFY=always APW_NOTIFY_ATTACH=1 nohup bash run_scheduler.sh \
+APW_NOTIFY=always APW_NOTIFY_ATTACH=1 nohup bash scripts/run_scheduler.sh \
   --interval-minutes 30 > reports/scheduler.log 2>&1 &
 
 # 两种形态都是每轮结束自动发完整报告邮件（正文 + report.zip 附件）
@@ -179,7 +179,7 @@ tail -3 reports/scheduler.log    # 末行应为「[scheduler] 收到停止信号
 
 ```bash
 # 启动（后台常驻，端口约定 18787）
-nohup bash run_api.sh --host 0.0.0.0 --port 18787 > reports/api.log 2>&1 &
+nohup bash scripts/run_api.sh --host 0.0.0.0 --port 18787 > reports/api.log 2>&1 &
 curl http://127.0.0.1:18787/health        # {"status": "ok", ...} = 起来了
 
 # 停止
@@ -228,12 +228,12 @@ user: "<部署机账号>"
 - 2026-10-14 二次部署（新增 `apw.api` 回归触发 API + `apw.notify` 通知邮件）
 - 2026-10-14 三次调整：收件人集中配置（`configs/notify.local.yaml`）+ 邮件附件与
   `report.zip` 同口径（`attach_run_zip` → `apw.api.build_report_zip`）
-- 2026-10-15 四次调整：一键跑测+发报告脚本（`run_and_mail.sh`/`.bat`）；发信通道
+- 2026-10-15 四次调整：一键跑测+发报告脚本（`scripts/run_and_mail.sh`/`.bat`）；发信通道
   明确推荐「私人邮箱 SMTP + 授权码」（无需 M365 权限，可无人值守）；记录自建 SMTP/MX
   直投不可行的原因（出口 IP 无 PTR）
 - 2026-10-15 五次部署：定时执行 + 自动报告邮件上服务器（`APW_NOTIFY=always
-  APW_NOTIFY_ATTACH=1 bash run_scheduler.sh`，每轮结束发摘要 + 完整 report.zip 附件）；
-  收件人收敛为单人（`configs/notify.local.yaml` 只留 zepeng.huang）；`run_and_mail.sh`/`.bat`
+  APW_NOTIFY_ATTACH=1 bash scripts/run_scheduler.sh`，每轮结束发摘要 + 完整 report.zip 附件）；
+  收件人收敛为单人（`configs/notify.local.yaml` 只留 zepeng.huang）；`scripts/run_and_mail.sh`/`.bat`
   补进打包白名单（此前漏打包）
 - 2026-10-15 六次调整：新增「服务启停与冒烟」一节并定为**交付必给**——每次部署给出
   启动 / 停止 / 冒烟（发信）三组命令；启动、停止、`--test` 发信冒烟与端到端冒烟均已实测

@@ -3,7 +3,7 @@
 # 探查期用 probe 保留名的通用原语推进状态；页面对象产品化后把 probe 步骤
 # 替换为 page: report_style 的动作（参考 configs/crawl/aml_chat.yaml）。
 # 「做同款」会弹出新窗口，本轮只留结构痕迹不真点（新窗口注意力切换放页面对象里做）。
-# 产物落 .scratch/autoPlayWright/snapshots/<env>/（gitignored，落盘自动脱敏）。
+# 产物落 .scratch/auto_playwright/snapshots/<env>/（gitignored，落盘自动脱敏）。
 name: report-style-probe
 targets:
   - id: report-style-lib

@@ -1,6 +1,6 @@
 # 套组广场第 1 轮探查（生成侧资产）：找「专家套组广场」入口、广场结构、「我的」页签、
 # 两个新建入口（广场右上角 / 我的页内）的真身；只看结构不提交（新建表单单看不建）。
-# 产物落 .scratch/autoPlayWright/snapshots/<env>/（gitignored，落盘自动脱敏）。
+# 产物落 .scratch/auto_playwright/snapshots/<env>/（gitignored，落盘自动脱敏）。
 name: suite-probe
 targets:
   - id: suite-plaza

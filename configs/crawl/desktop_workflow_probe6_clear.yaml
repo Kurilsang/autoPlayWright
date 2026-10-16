@@ -1,5 +1,5 @@
 # 桌面客户端工作流 AI 探查：清场（关 Wiki 设置遮罩等）+ 状态确认。
-# 产物入 .scratch/autoPlayWright/snapshots/desktop/（gitignored，落盘自动脱敏）。
+# 产物入 .scratch/auto_playwright/snapshots/desktop/（gitignored，落盘自动脱敏）。
 name: desktop-workflow-probe6-clear
 targets:
   - id: desktop-wf-clear

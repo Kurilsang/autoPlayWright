@@ -5,7 +5,7 @@
 # - 生成态状态机：is-streaming+「停止」→ is-done+「发送」回归；
 # - 切回后各工作流的 AI 会话/生成态各归各（prompt 回显 + 对方标记零混入）。
 # 用唯一名 apw-ai-par9-* 防历史 probe8 同名卡干扰。产物入
-# .scratch/autoPlayWright/snapshots/desktop/（gitignored，落盘自动脱敏）。
+# .scratch/auto_playwright/snapshots/desktop/（gitignored，落盘自动脱敏）。
 name: desktop-workflow-probe9
 targets:
   - id: desktop-wf-ai-par

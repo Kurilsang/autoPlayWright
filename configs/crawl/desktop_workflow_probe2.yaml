@@ -1,6 +1,6 @@
 # 桌面客户端工作流链路第二轮探查（生成侧资产）：建工作流进编辑器，
 # 采集 编辑器 → 编辑态 → 保存 → 运行中 → 运行完成 各状态结构（定位器/完成信号候选）。
-# 产物入 .scratch/autoPlayWright/snapshots/desktop/（gitignored，落盘自动脱敏）。
+# 产物入 .scratch/auto_playwright/snapshots/desktop/（gitignored，落盘自动脱敏）。
 name: desktop-workflow-probe2
 targets:
   - id: desktop-wf-editor-run

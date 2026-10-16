@@ -1,7 +1,7 @@
 # 桌面客户端工作流链路第三轮探查（生成侧资产）：真实手动写码运行全程。
 # 脚本编辑器是 CodeMirror（.cm-content，整体 insert_text 避免逐键自动缩进）；
 # 运行 = 详情「运行」打开运行视图（运行输入/历史运行）→ 再点「运行」执行。
-# 产物入 .scratch/autoPlayWright/snapshots/desktop/（gitignored，落盘自动脱敏）。
+# 产物入 .scratch/auto_playwright/snapshots/desktop/（gitignored，落盘自动脱敏）。
 name: desktop-workflow-probe3
 targets:
   - id: desktop-wf-manual-run

@@ -13,7 +13,7 @@
 #   GET  /runs/<run_id>/report.zip 下载产物包（report.html + JSON + 失败截图）
 #   GET  /runs                     最近若干轮      GET /health  存活探针
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 export PYTHONIOENCODING=utf-8
 
 if [ ! -x ".venv/bin/python" ]; then

@@ -5,7 +5,7 @@
 ## 顶层
 
 ```text
-autoPlayWright/
+auto_playwright/
 ├─ flows/                  业务链路用例（YAML DSL，一链路一文件）
 ├─ examples/               DSL 示例（fixture 夹具站点演示，不计业务链路）
 ├─ locators/               命名定位器仓库（一页一文件，禁止散落裸 selector）
@@ -17,15 +17,15 @@ autoPlayWright/
 ├─ reports/                运行产物（gitignored；report.html 会话结束自动渲染）
 ├─ workspace/              生成侧临时探查脚本（gitignored，不入库）
 ├─ .scratch/               任务票、评审批次、页面快照产物（快照不入库）
-├─ run_debug.bat           一键调试：单条/筛选链路，窗口可见 + 250ms 慢动作
-├─ run_and_mail.bat        一键：跑业务链路 + 发带附件的报告邮件（--no-mail 只跑）
-├─ run_full_debug.bat      全量调试：跑全部用例；桌面端自动带 --remote-debugging-port=9333 拉起客户端
-├─ run_slides.bat          打开 docs/banner-light.html 项目报告页
-├─ setup_linux.sh          Linux 一次性安装：venv + 依赖 + Playwright chromium（--with-deps 装系统库）
-├─ run_flows.sh            Linux/服务器跑网页端链路：默认无头，--debug 转调试模式，透传 pytest 参数
-├─ run_and_mail.sh         Linux 一键：跑业务链路 + 发带附件报告邮件（同 run_and_mail.bat）
-├─ run_scheduler.sh        Linux 定时执行守护：默认 30 分钟一轮（--once 单跑，-- 后透传 pytest 参数）
-├─ run_api.sh              Linux 回归触发 API（外部服务触发跑测、取 zip 产物）
+├─ scripts/run_debug.bat           一键调试：单条/筛选链路，窗口可见 + 250ms 慢动作
+├─ scripts/run_and_mail.bat        一键：跑业务链路 + 发带附件的报告邮件（--no-mail 只跑）
+├─ scripts/run_full_debug.bat      全量调试：跑全部用例；桌面端自动带 --remote-debugging-port=9333 拉起客户端
+├─ scripts/run_slides.bat          打开 docs/banner-light.html 项目报告页
+├─ scripts/setup_linux.sh          Linux 一次性安装：venv + 依赖 + Playwright chromium（--with-deps 装系统库）
+├─ scripts/run_flows.sh            Linux/服务器跑网页端链路：默认无头，--debug 转调试模式，透传 pytest 参数
+├─ scripts/run_and_mail.sh         Linux 一键：跑业务链路 + 发带附件报告邮件（同 scripts/run_and_mail.bat）
+├─ scripts/run_scheduler.sh        Linux 定时执行守护：默认 30 分钟一轮（--once 单跑，-- 后透传 pytest 参数）
+├─ scripts/run_api.sh              Linux 回归触发 API（外部服务触发跑测、取 zip 产物）
 ├─ pyproject.toml          包定义 + pytest11 插件入口
 ├─ README.md               使用入口（安装、配置、常用命令）
 └─ AGENTS.md               Agent 规则：硬约束、新页面五步走、已知产品行为/缺陷
@@ -86,9 +86,9 @@ autoPlayWright/
 | `tests/fixture_site/` | 本地夹具站点（框架自测 + 示例链路的被测对象） |
 | `reports/<run_id>/` | `<flow_id>.json` + `run-summary.json` + `report.html`（run_id = 时间戳+熵后缀） |
 | `reports/scheduler/run-<ts>.log` | 定时执行每轮日志（scheduler 产物，gitignored） |
-| `.scratch/autoPlayWright/issues/` | 主线任务票 01~08（依赖序） |
+| `.scratch/auto_playwright/issues/` | 主线任务票 01~08（依赖序） |
 | `.scratch/review-p0/` | 评审修复批（spec + 票 + P1/P2 backlog） |
-| `.scratch/autoPlayWright/snapshots/` | 页面快照产物（JSON/HTML/PNG/TXT 均不入库） |
+| `.scratch/auto_playwright/snapshots/` | 页面快照产物（JSON/HTML/PNG/TXT 均不入库） |
 | `workspace/` | 一次性探查脚本（不入库） |
 | `video/`、`run_video.bat` | 本地演示资产（Remotion 汇报动画出片），gitignored 不入库 |
 | `docs/banner-light.html` | 项目报告页（banner 轮播） |

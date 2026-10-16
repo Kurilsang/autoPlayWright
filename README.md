@@ -1,4 +1,4 @@
-# autoPlayWright（apw）
+# auto_playwright（apw）
 
 Agent 产品的 UI 自动化测试框架：业务链路用 YAML DSL 编排（步骤/参数/断言），
 判定语义沉淀为页面对象原语（Python），pytest 解释执行，
@@ -6,7 +6,7 @@ Web 端与 Electron 客户端共用一套用例，报告输出结构化 JSON + H
 
 - 规格：`docs/SPEC.md`（决策记录见附录）
 - 用例进度：`docs/CASE_PROGRESS.md`；目录结构：`docs/STRUCTURE.md`
-- 任务票：`.scratch/autoPlayWright/issues/`
+- 任务票：`.scratch/auto_playwright/issues/`
 
 ## 快速开始
 
@@ -25,9 +25,9 @@ python -m venv .venv
 .venv\Scripts\pytest tests flows
 ```
 
-Linux / 服务器（网页端）：`bash setup_linux.sh --with-deps` 一键装好（venv + 依赖 + Playwright chromium），
-`bash run_flows.sh` 无头跑业务链路（`--debug` 转窗口可见 + 慢动作，其余参数透传 pytest）。
-容器以 root 跑 Chromium 需加启动参数：`APW_CHROMIUM_ARGS="--no-sandbox --disable-dev-shm-usage" bash run_flows.sh`。
+Linux / 服务器（网页端）：`bash scripts/setup_linux.sh --with-deps` 一键装好（venv + 依赖 + Playwright chromium），
+`bash scripts/run_flows.sh` 无头跑业务链路（`--debug` 转窗口可见 + 慢动作，其余参数透传 pytest）。
+容器以 root 跑 Chromium 需加启动参数：`APW_CHROMIUM_ARGS="--no-sandbox --disable-dev-shm-usage" bash scripts/run_flows.sh`。
 
 ## 启动方式（全部入口）
 
@@ -35,10 +35,10 @@ Linux / 服务器（网页端）：`bash setup_linux.sh --with-deps` 一键装�
 
 | 入口 | 用途 |
 |------|------|
-| `run_debug.bat` | 一键调试：`pytest flows --apw-env test --apw-headed --apw-slowmo 250`，额外参数透传 pytest（如 `-k smoke`、`--apw-env fixture`） |
-| `run_and_mail.bat` | 一键：跑 `flows` + 发带附件（run 目录 zip）的报告邮件；`--no-mail` 只跑、`--to/--cc` 覆盖收件人、`--env` 换环境，其余透传 pytest（见「报告邮件」） |
-| `run_full_debug.bat` | 全量调试跑全部用例（P1 框架自测 → P2 登录冒烟 → P3 夹具样例 → P4 网页端链路 → P5 桌面端链路）；桌面端自动带 `--remote-debugging-port=9333` 拉起客户端并等 CDP 就绪；`APW_SLOWMO` 调慢动作 |
-| `run_slides.bat` | 打开 `docs/banner-light.html` 项目报告页 |
+| `scripts/run_debug.bat` | 一键调试：`pytest flows --apw-env test --apw-headed --apw-slowmo 250`，额外参数透传 pytest（如 `-k smoke`、`--apw-env fixture`） |
+| `scripts/run_and_mail.bat` | 一键：跑 `flows` + 发带附件（run 目录 zip）的报告邮件；`--no-mail` 只跑、`--to/--cc` 覆盖收件人、`--env` 换环境，其余透传 pytest（见「报告邮件」） |
+| `scripts/run_full_debug.bat` | 全量调试跑全部用例（P1 框架自测 → P2 登录冒烟 → P3 夹具样例 → P4 网页端链路 → P5 桌面端链路）；桌面端自动带 `--remote-debugging-port=9333` 拉起客户端并等 CDP 就绪；`APW_SLOWMO` 调慢动作 |
+| `scripts/run_slides.bat` | 打开 `docs/banner-light.html` 项目报告页 |
 | `run_video.bat` | Remotion 演示动画出片（`video/` 本地资产，gitignored，可选） |
 | `.venv\Scripts\pytest ...` | 直接调 pytest（配方见「常用命令」） |
 
@@ -46,16 +46,16 @@ Linux / 服务器（网页端）：`bash setup_linux.sh --with-deps` 一键装�
 
 | 入口 | 用途 |
 |------|------|
-| `bash setup_linux.sh` | 一次性安装：venv + pip 依赖 + Playwright chromium；`--with-deps` 另装 Chromium 系统库（需 root） |
-| `bash run_flows.sh` | 无头跑业务链路（默认 `flows --apw-env test`）；`--debug` 转窗口可见 + 250ms 慢动作；`--debug`/`--apw-env` 之外参数透传 pytest |
-| `bash run_and_mail.sh` | 一键：跑业务链路 + 发带附件报告邮件（同 `run_and_mail.bat`） |
-| `bash run_scheduler.sh` | 定时执行常驻（默认 30 分钟一轮）；`--once` 单跑一轮退出；`--` 后透传 pytest 参数（见「定时执行」） |
+| `bash scripts/setup_linux.sh` | 一次性安装：venv + pip 依赖 + Playwright chromium；`--with-deps` 另装 Chromium 系统库（需 root） |
+| `bash scripts/run_flows.sh` | 无头跑业务链路（默认 `flows --apw-env test`）；`--debug` 转窗口可见 + 250ms 慢动作；`--debug`/`--apw-env` 之外参数透传 pytest |
+| `bash scripts/run_and_mail.sh` | 一键：跑业务链路 + 发带附件报告邮件（同 `scripts/run_and_mail.bat`） |
+| `bash scripts/run_scheduler.sh` | 定时执行常驻（默认 30 分钟一轮）；`--once` 单跑一轮退出；`--` 后透传 pytest 参数（见「定时执行」） |
 
 **模块入口（跨平台，Python 直调）**
 
 | 入口 | 用途 |
 |------|------|
-| `python -m apw.scheduler` | 定时调度内核（`run_scheduler.sh` 即其包装；Windows 定时用它） |
+| `python -m apw.scheduler` | 定时调度内核（`scripts/run_scheduler.sh` 即其包装；Windows 定时用它） |
 | `python -m apw.notify` | 通知邮件直发（`--test` 冒烟 / `--summary <run-summary.json> --report-zip` 发报告；见「报告邮件」） |
 | `python -m apw.crawler` | 页面状态快照（AI 生成事实依据 / 改版 diff 基线；`--env`/`--config` 见「常用命令」） |
 | `python -m apw.reporter.html_report reports/<run_id>` | HTML 报告重渲染（会话结束已自动渲染一次） |
@@ -108,9 +108,9 @@ auth:
 | `APW_USERNAME` / `APW_PASSWORD` | form 登录凭据（优先于 `secrets.local.yaml`） |
 | `APW_CHROMIUM_ARGS` | 追加 chromium 启动参数（shell 风格分词）；容器 root 必加 `"--no-sandbox --disable-dev-shm-usage"` |
 | `APW_CDP_ENDPOINT` | 覆盖桌面端 `cdp_endpoint`（默认调试端口被占时换端口） |
-| `APW_DESKTOP_EXE` | 桌面客户端 exe 路径（`run_full_debug.bat` 拉起用，优先于 `desktop.local.bat`） |
-| `APW_SLOWMO` | `run_full_debug.bat` 慢动作毫秒数（默认 250） |
-| `PYTHON` | `setup_linux.sh` 指定 Python 解释器（如 `PYTHON=python3.12`） |
+| `APW_DESKTOP_EXE` | 桌面客户端 exe 路径（`scripts/run_full_debug.bat` 拉起用，优先于 `desktop.local.bat`） |
+| `APW_SLOWMO` | `scripts/run_full_debug.bat` 慢动作毫秒数（默认 250） |
+| `PYTHON` | `scripts/setup_linux.sh` 指定 Python 解释器（如 `PYTHON=python3.12`） |
 | `PYTHONIOENCODING` | 控制台/子进程输出编码（各脚本内已默认 utf-8） |
 
 ### 命令行选项
@@ -164,7 +164,7 @@ steps:
 | 页面动作 | `src/apw/pages/`（Page Object，平台无关） |
 | 环境配置 | `configs/envs/<env>.yaml`（`--apw-env` 选择） |
 | 脱敏映射 | `configs/sanitize.local.yaml`（敏感串→占位符，真实值仅存本地；模板 `configs/sanitize.example.yaml`）——快照/探查产物落盘前自动脱敏 |
-| 页面状态快照 | `configs/crawl/*.yaml`（爬取配置）→ `.scratch/autoPlayWright/snapshots/<env>/`（AI 生成事实依据 + 改版 diff 基线；JSON/HTML/PNG 均不入库） |
+| 页面状态快照 | `configs/crawl/*.yaml`（爬取配置）→ `.scratch/auto_playwright/snapshots/<env>/`（AI 生成事实依据 + 改版 diff 基线；JSON/HTML/PNG 均不入库） |
 | JSON 报告 | `reports/<run_id>/<flow_id>.json` + `run-summary.json`（run_id = 时间戳+熵后缀全局唯一，汇总为合并语义；含 `capture_context` 采集的完整对话上下文证据：用户输入 / 推理步骤 / 思考过程 / 最终答案，三态 passed/failed/skipped + 跳过原因） |
 | HTML 报告 | `reports/<run_id>/report.html`（会话结束自动渲染，单文件、零依赖；也可 `python -m apw.reporter.html_report reports/<run_id>` 重渲染） |
 
@@ -181,8 +181,8 @@ pytest flows/desktop_chat_smoke.yaml --apw-env desktop
 
 # 调试模式：窗口可见 + 放慢动作，实时观察执行过程
 pytest flows --apw-env test --apw-headed --apw-slowmo 250
-# 或直接双击 / 运行 run_debug.bat（等价于上面这条，可追加 pytest 参数）
-# run_full_debug.bat = 全量调试跑全部用例（桌面端自动带调试端口拉起客户端）
+# 或直接双击 / 运行 scripts/run_debug.bat（等价于上面这条，可追加 pytest 参数）
+# scripts/run_full_debug.bat = 全量调试跑全部用例（桌面端自动带调试端口拉起客户端）
 
 # 页面状态快照（AI 生成的事实依据 / 页面改版 diff 基线）
 python -m apw.crawler --env test --config configs/crawl/aml_chat.yaml
@@ -195,7 +195,7 @@ python -m apw.crawler --env test --config configs/crawl/aml_chat.yaml
 ```powershell
 # 一键：跑 flows 并发送（Windows / Linux）
 .\run_and_mail.bat
-bash run_and_mail.sh
+bash scripts/run_and_mail.sh
 
 # 只跑不发 / 换环境 / 临时改收件人（其余参数透传 pytest）
 .\run_and_mail.bat --no-mail
@@ -234,19 +234,19 @@ notify:
 
 ## 定时执行（固定间隔 / cron 钟点锚定）
 
-调度器 `python -m apw.scheduler`（Linux 用 `run_scheduler.sh` 等价包装），排期在服务内自管：
+调度器 `python -m apw.scheduler`（Linux 用 `scripts/run_scheduler.sh` 等价包装），排期在服务内自管：
 
 ```bash
-bash run_scheduler.sh                      # 常驻：每 30 分钟跑 flows --apw-env test
-APW_NOTIFY=always APW_NOTIFY_ATTACH=1 bash run_scheduler.sh   # 同上（每 30 分钟）+ 每轮自动发完整报告邮件
-bash run_scheduler.sh --interval-minutes 60  # 调整间隔
-bash run_scheduler.sh --cron "0 21 * * *"    # 每天 21:00（cron 钟点锚定，首轮到点才跑）
-bash run_scheduler.sh --cron "0 18 * * 5"    # 每周五 18:00（周频率）
-bash run_scheduler.sh --cron "0 21 * * *" --cron "0 18 * * 5"   # 多档并集：每天 21:00 + 每周五 18:00
-bash run_scheduler.sh --cron "0 21 * * 1"    # 每周一 21:00（周频率）
-bash run_scheduler.sh --cron "0 21 1 * *"    # 每月 1 日 21:00（月频率）
-bash run_scheduler.sh --once               # 单跑一轮就退出（联调/冒烟；立即执行）
-bash run_scheduler.sh -- --apw-env fixture   # `--` 后透传 pytest 参数（替换默认）
+bash scripts/run_scheduler.sh                      # 常驻：每 30 分钟跑 flows --apw-env test
+APW_NOTIFY=always APW_NOTIFY_ATTACH=1 bash scripts/run_scheduler.sh   # 同上（每 30 分钟）+ 每轮自动发完整报告邮件
+bash scripts/run_scheduler.sh --interval-minutes 60  # 调整间隔
+bash scripts/run_scheduler.sh --cron "0 21 * * *"    # 每天 21:00（cron 钟点锚定，首轮到点才跑）
+bash scripts/run_scheduler.sh --cron "0 18 * * 5"    # 每周五 18:00（周频率）
+bash scripts/run_scheduler.sh --cron "0 21 * * *" --cron "0 18 * * 5"   # 多档并集：每天 21:00 + 每周五 18:00
+bash scripts/run_scheduler.sh --cron "0 21 * * 1"    # 每周一 21:00（周频率）
+bash scripts/run_scheduler.sh --cron "0 21 1 * *"    # 每月 1 日 21:00（月频率）
+bash scripts/run_scheduler.sh --once               # 单跑一轮就退出（联调/冒烟；立即执行）
+bash scripts/run_scheduler.sh -- --apw-env fixture   # `--` 后透传 pytest 参数（替换默认）
 # 停止：pkill -f apw.scheduler（SIGTERM 优雅停，当前轮子进程一并终止）
 # Windows：.venv\Scripts\python -m apw.scheduler（同一模块）
 ```
@@ -298,8 +298,8 @@ bash run_scheduler.sh -- --apw-env fixture   # `--` 后透传 pytest 参数（�
 
 ```bash
 # 启动（Linux；默认端口 18787）
-bash run_api.sh                                       # 本机自测（只绑 127.0.0.1）
-nohup bash run_api.sh --host 0.0.0.0 --port 18787 > reports/api.log 2>&1 &   # 跨机（须配 token）
+bash scripts/run_api.sh                                       # 本机自测（只绑 127.0.0.1）
+nohup bash scripts/run_api.sh --host 0.0.0.0 --port 18787 > reports/api.log 2>&1 &   # 跨机（须配 token）
 
 # Windows
 .venv\Scripts\python -m apw.api --port 18787

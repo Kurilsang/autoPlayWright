@@ -39,6 +39,9 @@ def default_registry() -> PageRegistry:
     from apw.pages.aml_chat import AmlChatPage
     from apw.pages.aml_workflow import AmlWorkflowPage
     from apw.pages.desktop_chat import DesktopChatPage
+    from apw.pages.desktop_mcp import DesktopMcpPage
+    from apw.pages.desktop_search import DesktopSearchPage
+    from apw.pages.desktop_skill import DesktopSkillPage
     from apw.pages.desktop_workflow import DesktopWorkflowPage
     from apw.pages.playground import PlaygroundPage
     from apw.pages.report_style import ReportStylePage
@@ -50,6 +53,9 @@ def default_registry() -> PageRegistry:
     registry.register("aml_chat", AmlChatPage)
     registry.register("aml_workflow", AmlWorkflowPage)
     registry.register("desktop_chat", DesktopChatPage)
+    registry.register("desktop_mcp", DesktopMcpPage)
+    registry.register("desktop_search", DesktopSearchPage)
+    registry.register("desktop_skill", DesktopSkillPage)
     registry.register("desktop_workflow", DesktopWorkflowPage)
     registry.register("playground", PlaygroundPage)
     registry.register("report_style", ReportStylePage)

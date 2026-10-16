@@ -1,0 +1,334 @@
+# 桌面端（Electron 客户端）stdio MCP 链路用例。
+#
+# 覆盖：
+#   设置 → MCP → 添加服务器（stdio 默认传输方式）→ 填名称/启动命令/参数
+#   → 保存 → 重新连接 → 卡片回显 + 浏览详情（Resources/Prompts）
+#   → 新开对话调用 MCP 工具（核对本地进程真的被执行）。
+#   外部真实 MCP 接入（与手工添加的夹具**并存**）：
+#   @modelcontextprotocol/server-everything（官方参考）+ @mcpcn/12306-ticket-search-mcp
+#   （12306 票务）→ 连接 → 浏览能力面 → 新开对话调用，判定同样取调用流水账。
+#
+# 事实来源（实测客户端 0.2.2 / Electron 39.8.10，2026-10-12，CDP attach 探查）：
+# - 桌面端**支持 stdio**（与 Web 端不同：Web 端仅 streamableHttp，无 transport 字段）；
+# - 「添加服务器」表单默认折叠，传输方式三选一且 **stdio 默认选中**；
+# - **保存后不自动连接**（新卡「0 工具 / 未连接」）→ 必须点「重新连接」才「N 工具 / 已连接」；
+# - 「浏览」为内联面板：Resources 条目用「查看」、Prompts 条目用「获取」；
+# - 会话里的工具调用块只渲染 `mcp` + 截断的名称前缀（实测 'apw'），
+#   **拿不到工具全名** → 本用例的调用判定取夹具进程「调用流水账」，
+#   UI 的 `Called N tool(s)` 仅作在场性证据，绝不据 LLM 措辞下结论。
+#
+# 测试夹具：tests/fixture_mcp/apw_test_mcp.py（零依赖 stdio MCP server，3 工具 + 2 资源 + 1 提示词）。
+# 外部 MCP 前置：.venv/Scripts/python scripts/setup_external_mcp.py（落地 npm 包到 .scratch/mcp_servers）。
+# 说明：按约定**不删除**已添加的服务器（便于人工复核）；如需清理，在设置→MCP 手工删除。
+# 服务器幂等：同名已存在则复用（不重复累积）；三台服务器工具名互不冲突
+# （apwfix_* / get-sum 等 / get-station-code-of-citys），提示词均显式点名服务器消除歧义。
+#
+# 平台矩阵：platforms: [desktop] → 在 web 环境运行会自动 skip 并留痕（报告可见）。
+meta:
+  id: desktop-mcp-stdio
+  name: 桌面端 stdio MCP：添加服务器 → 连接 → 回显/浏览详情 → 新开对话调用工具
+  platforms: [desktop]
+  envs: [desktop]
+  tags: [P0, mcp, stdio, desktop]
+  owner: qa
+steps:
+  # ========== 1. 入口：设置 → MCP（含调用流水账基线，供第 5 段判「本次新增调用」）==========
+  - do: { page: desktop_mcp, action: open_settings_mcp, args: {} }
+  - assert: { type: visible, page: desktop_mcp, target: nav_mcp_active }
+  - assert: { type: visible, page: desktop_mcp, target: add_server_button }
+
+  # ========== 2. 添加 stdio 服务器（stdio 默认选中；名称固定便于按名引用）==========
+  - do:
+      page: desktop_mcp
+      action: add_stdio_server
+      args:
+        name: apw-stdio-mcp
+        command: .venv/Scripts/python.exe
+        args: ["tests/fixture_mcp/apw_test_mcp.py"]
+  - do: { page: desktop_mcp, action: verify_card_echo, args: { expect_transport: "stdio" } }
+  - assert: { type: visible, page: desktop_mcp, target: server_card }
+  - assert: { type: visible, page: desktop_mcp, target: server_badge_transport }
+
+  # ========== 3. 连接（保存后不自动连接，须显式重连）==========
+  - do: { page: desktop_mcp, action: connect_server, args: { timeout_ms: 30000 } }
+
+  # ========== 4. 浏览详情：Resources 点「查看」得正文；Prompts 条目在场 ==========
+  - do:
+      page: desktop_mcp
+      action: browse_resources
+      args: { expect_name: "APW 探针说明", expect_content: "APW_STDIO_RESOURCE_OK" }
+  - do:
+      page: desktop_mcp
+      action: browse_prompts
+      args: { expect_name: "apw_greet" }
+
+  # ========== 5. 新开对话调用 MCP 工具（判定取夹具流水账，非 LLM 措辞）==========
+  # 提示词显式点名「服务器名 + 工具名」：环境里可能存在其他提供同名工具的服务器
+  # （实测踩坑：模型曾调用另一台服务器的 apw_add），点名可消除歧义。
+  - do: { page: desktop_mcp, action: back_to_chat, args: {} }
+  - do: { page: desktop_chat, action: new_task, args: {} }
+  # new_task 会断开全部 MCP（notifyRootsChanged）→ 发消息前确保已连接
+  - do:
+      page: desktop_mcp
+      action: ensure_server_connected
+      args: { name: "apw-stdio-mcp", timeout_ms: 60000 }
+  - do:
+      page: desktop_chat
+      action: send_message
+      args:
+        text: >-
+          请调用 MCP 服务器 apw-stdio-mcp 提供的工具 apwfix_add 计算 17 加 25，
+          再调用同一服务器的 apwfix_time 获取当前时间。
+          只使用 apwfix_ 开头的工具，把两个工具的原始返回文本原样贴出来。
+        tag: mcp-tool
+  - do: { page: desktop_chat, action: wait_reply_done, args: { timeout_ms: 180000 } }
+  - do:
+      page: desktop_mcp
+      action: verify_tool_called
+      args: { tool: "apwfix_add", expect_result: "APW_STDIO_ADD_OK", timeout_ms: 30000 }
+  - do:
+      page: desktop_mcp
+      action: verify_tool_called
+      args: { tool: "apwfix_time", expect_result: "APW_STDIO_TIME_OK", timeout_ms: 30000 }
+  - do: { page: desktop_chat, action: capture_context, args: {} }
+
+  # ========== 6. 会话侧确定性断言（工具调用块在场 + 用户输入回显）==========
+  - assert: { type: visible, page: desktop_mcp, target: msg_tools }
+  - assert: { type: visible, page: desktop_chat, target: user_message }
+  - assert: { type: text_contains, page: desktop_chat, target: user_message, expected: "apwfix_add" }
+
+  # ==========================================================================
+  # 7. 外部真实 MCP 接入（与手工添加的夹具服务器**并存**）
+  # ==========================================================================
+  # 两个真实第三方 npm 包（scripts/setup_external_mcp.py 落地到 .scratch/mcp_servers）：
+  #   @modelcontextprotocol/server-everything  官方参考实现：7 资源 + 4 提示词 + 13 工具
+  #   @mcpcn/12306-ticket-search-mcp           真实业务：12306 火车票查询，5 工具
+  #
+  # 为什么经代理（tests/fixture_mcp/mcp_proxy.py）：
+  #   真实 MCP 不会写调用流水账 → 「工具真被调用」无确定性判据。代理逐帧透明转发
+  #   JSON-RPC 并顺带记账（与夹具同一份流水账），判定手段统一且不改真实行为。
+  # 为什么用 node 直跑而不用 npx：
+  #   实测客户端 shell:false spawn 下 Node 24 中 `npx` ENOENT、`npx.cmd` EINVAL。
+  #
+  # 判定口径（按需求：只测「能连上 + 可调用」，返回值内容留证据供人工查看）：
+  #   连接 = 卡片「已连接 + N 工具（N>0）」；调用 = 代理流水账命中工具名。
+  #   具体返回值**只进证据不做断言**（真实数据会变：余票/日期/外部服务状态）。
+
+  # ---- 7.1 接入 server-everything（官方参考实现）----
+  - do: { page: desktop_mcp, action: open_settings_mcp, args: {} }
+  - do:
+      page: desktop_mcp
+      action: add_external_mcp_server
+      args:
+        name: apw-ext-everything
+        package: "@modelcontextprotocol/server-everything"
+        entry: dist/index.js
+  - do:
+      page: desktop_mcp
+      action: verify_card_echo
+      args: { name: "apw-ext-everything", expect_transport: "stdio" }
+  - do:
+      page: desktop_mcp
+      action: connect_server
+      args: { name: "apw-ext-everything", timeout_ms: 60000 }
+  - assert: { type: visible, page: desktop_mcp, target: server_card }
+  - assert: { type: visible, page: desktop_mcp, target: server_badge_transport }
+  - assert: { type: visible, page: desktop_mcp, target: server_badge_tools }
+
+  # 浏览面板：官方实现提供 7 资源 + 4 提示词（确定性结构，不断言正文措辞）
+  - do:
+      page: desktop_mcp
+      action: browse_resources
+      args: { name: "apw-ext-everything", expect_name: "features.md" }
+  - do:
+      page: desktop_mcp
+      action: browse_prompts
+      args: { name: "apw-ext-everything", expect_name: "simple-prompt" }
+
+  # ---- 7.2 接入 12306 票务 MCP（真实业务）----
+  - do:
+      page: desktop_mcp
+      action: add_external_mcp_server
+      args:
+        name: apw-ext-12306
+        package: "@mcpcn/12306-ticket-search-mcp"
+        entry: dist/index.js
+  - do:
+      page: desktop_mcp
+      action: verify_card_echo
+      args: { name: "apw-ext-12306", expect_transport: "stdio" }
+  - do:
+      page: desktop_mcp
+      action: connect_server
+      args: { name: "apw-ext-12306", timeout_ms: 60000 }
+  # 12306 只提供 tools 能力（无 resources/prompts）→ 不浏览，符合能力面
+
+  # ---- 7.3 新开对话：调用 everything 的确定性工具 get-sum ----
+  # get-sum 返回值稳定（17+25=42），仍只作证据、不做断言（判定靠流水账）
+  - do: { page: desktop_mcp, action: back_to_chat, args: {} }
+  - do: { page: desktop_chat, action: new_task, args: {} }
+  # ⚠️ 产品行为（实测）：new_task 切换工作区 → notifyRootsChanged → **断开全部 MCP**，
+  #    之后懒重连且不保证及时。故发消息前显式确保目标服务器已连接，
+  #    否则模型拿不到工具 → 误判 tool_not_invoked。
+  - do:
+      page: desktop_mcp
+      action: ensure_server_connected
+      args: { name: "apw-ext-everything", timeout_ms: 60000 }
+  - do:
+      page: desktop_chat
+      action: send_message
+      args:
+        text: >-
+          请调用 MCP 服务器 apw-ext-everything 提供的工具 get-sum，
+          参数 a=17、b=25。只使用该服务器的工具，把工具返回的原文贴出来。
+        tag: ext-everything
+  # require_thinking=false：外部 MCP 轮次的判定锚在代理流水账（工具真被调用）+ 回答气泡，
+  # 不把 Thought 块当必备结构——模型偶发走「工具调用快路径」（服务端首输出直接 tool_call、
+  # 跳过 reasoning）时前端不渲染 Thought，硬性要求会误判正常轮次（2026-10-14 实测缺失率约 50%）。
+  - do:
+      page: desktop_chat
+      action: wait_reply_done
+      args: { timeout_ms: 180000, require_thinking: false }
+  - do:
+      page: desktop_mcp
+      action: verify_tool_called
+      args:
+        tool: "get-sum"
+        server: "apw-ext-everything"
+        timeout_ms: 30000
+  - do: { page: desktop_chat, action: capture_context, args: {} }
+  - assert: { type: visible, page: desktop_mcp, target: msg_tools }
+
+  # ---- 7.4 新开对话：调用 12306 的站点查询（确定性最强：不依赖日期/余票）----
+  - do: { page: desktop_chat, action: new_task, args: {} }
+  - do:
+      page: desktop_mcp
+      action: ensure_server_connected
+      args: { name: "apw-ext-12306", timeout_ms: 60000 }
+  - do:
+      page: desktop_chat
+      action: send_message
+      args:
+        text: >-
+          请调用 MCP 服务器 apw-ext-12306 提供的工具 get-station-code-of-citys，
+          参数 citys=上海。只使用该服务器的工具，把工具返回的原文贴出来。
+        tag: ext-12306
+  # 同 7.3：外部 MCP 轮次不审 Thought 块（判定取代理流水账 + 回答气泡）
+  - do:
+      page: desktop_chat
+      action: wait_reply_done
+      args: { timeout_ms: 180000, require_thinking: false }
+  - do:
+      page: desktop_mcp
+      action: verify_tool_called
+      args:
+        tool: "get-station-code-of-citys"
+        server: "apw-ext-12306"
+        timeout_ms: 30000
+  - do: { page: desktop_chat, action: capture_context, args: {} }
+  - assert: { type: visible, page: desktop_mcp, target: msg_tools }
+
+  # ==========================================================================
+  # 8. 从 mcp.json 导入（P0：用户实际会用的入口之一）
+  # ==========================================================================
+  # 产品行为（实测 2026-10-13）：按钮读**固定路径**（全局 ~/.<产品目录>/mcp.json +
+  #   项目级 <workspace>/.<ProductDir>/mcp.json，项目优先）——无文件选择器、无粘贴框。
+  #   点按钮 → .workspace-overlay 预览面板列「名称 (transport)」→「确认导入」。
+  # 合并语义（易踩坑，本段固化为断言）：
+  #   • 按名覆盖，**只增改、从不删除**：文件里删掉的条目导入后旧卡仍在；
+  #   • **文件压过界面**：UI 手动关掉的开关会被导入翻回文件里的状态；
+  #   • `disabled:true` → `enabled:false`（**反义**映射）。
+  # 用例自带清理：写入前备份全局 mcp.json，末步还原，不污染本机真实配置。
+  - do: { page: desktop_mcp, action: open_settings_mcp, args: {} }
+  # 前置清理，保证**幂等可重跑**（上次失败残留不会污染本次判定）：
+  #   ① DB 里的 apw-json-* 必须删掉 —— 产品导入是「只增改不删」的合并语义，
+  #      上次遗留的同名条目不会被本次导入清掉，会让 expect_absent 误判（实测踩坑）；
+  #   ② mcp.json 侧车备份/污染文件回收 —— 回到「文件不存在」的干净起点；
+  #   ③ 卡面兜底清理（幂等）。
+  - do: { page: desktop_mcp, action: purge_temp_servers, args: { prefix: "apw-json-" } }
+  - do: { page: desktop_mcp, action: reset_mcp_json, args: {} }
+  - do:
+      page: desktop_mcp
+      action: write_mcp_json
+      args:
+        servers:
+          apw-json-imported:
+            type: stdio
+            command: .venv/Scripts/python.exe
+            args: ["tests/fixture_mcp/apw_test_mcp.py"]
+          apw-json-disabled:
+            type: stdio
+            command: .venv/Scripts/python.exe
+            args: ["tests/fixture_mcp/apw_test_mcp.py"]
+            disabled: true
+  # 预览面板应列出文件里的两台；不得出现既有的三台（证明预览只反映文件内容）
+  - do:
+      page: desktop_mcp
+      action: import_from_mcp_json
+      args:
+        expect_names: ["apw-json-imported", "apw-json-disabled"]
+        expect_absent: ["apw-ext-12306"]
+  # 落盘核对：新增两台 + 既有三台都在（并存，不覆盖无关条目）
+  - do:
+      page: desktop_mcp
+      action: verify_config_state
+      args:
+        expect_present: ["apw-json-imported", "apw-json-disabled", "apw-stdio-mcp", "apw-ext-12306"]
+  # 卡面核对：disabled:true 应落成开关关闭（enabled=false）
+  - assert: { type: visible, page: desktop_mcp, target: server_card }
+  - do:
+      page: desktop_mcp
+      action: verify_config_state
+      args:
+        expect_enabled: { "apw-json-disabled": false, "apw-json-imported": true }
+  # 重复导入幂等：再导一次不应产生重复卡（合并按名覆盖）
+  # verify_config_state 内置「重复名恒为缺陷」检查 → 本步同时守住幂等性
+  - do:
+      page: desktop_mcp
+      action: import_from_mcp_json
+      args:
+        expect_names: ["apw-json-imported", "apw-json-disabled"]
+  - do:
+      page: desktop_mcp
+      action: verify_config_state
+      args:
+        expect_present: ["apw-json-imported", "apw-json-disabled"]
+
+  # ==========================================================================
+  # 9. 编辑已有服务器（P0）：卡片原地变表单 → 改启动命令 → 保存 → 回显生效
+  # ==========================================================================
+  # 只改命令/参数（名字是身份锚，不改名以免后续按名定位失效）；
+  # 保存判据 = 退出编辑态（.is-editing 消失）且命令行回显含新值（产品无 toast）。
+  - do:
+      page: desktop_mcp
+      action: edit_server
+      args:
+        name: "apw-json-imported"
+        command: .venv/Scripts/python.exe
+        args: ["tests/fixture_mcp/apw_test_mcp.py"]
+  - do:
+      page: desktop_mcp
+      action: verify_config_state
+      args:
+        expect_present: ["apw-json-imported"]
+
+  # ==========================================================================
+  # 10. 删除（P0）：删自建临时条目 → 卡片消失 + **落盘配置真移除**
+  # ==========================================================================
+  # **危险动作**：实测**无确认弹层**（无 window.confirm / 无 .modal），点红按钮即生效。
+  # 故只删本用例自己建的 apw-json-* 条目，绝不碰夹具与外部 MCP。
+  # UI 卡片消失 ≠ 配置真移除（可能只是列表没刷新）→ 断言必须落到 app.sqlite 落盘值。
+  - do: { page: desktop_mcp, action: delete_server, args: { name: "apw-json-imported" } }
+  - do: { page: desktop_mcp, action: delete_server, args: { name: "apw-json-disabled" } }
+  - do:
+      page: desktop_mcp
+      action: verify_config_state
+      args:
+        expect_absent: ["apw-json-imported", "apw-json-disabled"]
+        expect_present: ["apw-stdio-mcp", "apw-ext-everything", "apw-ext-12306"]
+  # 收尾：还原全局 mcp.json（本机真实配置不受污染）
+  - do: { page: desktop_mcp, action: restore_mcp_json, args: {} }
+  # 兜底：确保无临时残留（失败重跑也干净）
+  - do: { page: desktop_mcp, action: purge_temp_servers, args: { prefix: "apw-json-" } }
+
+  - judge: { note: "v1 预留：MCP 工具返回值与回答质量由 LLM-as-Judge 判定；本链路判定已由调用流水账（夹具 + 外部代理同一份）+ UI 结构信号 + app.sqlite 落盘核对完成；真实 MCP 返回值仅入证据供人工核对" }

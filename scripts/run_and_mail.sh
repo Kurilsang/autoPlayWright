@@ -13,7 +13,7 @@
 # 注意：本脚本只跑 flows（业务链路）。tests 是框架自测，需要 --apw-env fixture，
 # 与真实环境混跑会出一批假红，故不在这里跑（要跑请单独 pytest tests）。
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 
 PY=".venv/bin/python"
 [ -x "$PY" ] || PY=".venv/Scripts/python.exe"

@@ -1,0 +1,306 @@
+# 桌面客户端「设置 → MCP」页（Electron 打包 Web 界面，CDP attach 探查 2026-10-12）。
+#
+# 产品事实（实测客户端 0.2.2 / Electron 39.8.10）：
+# - 入口 = 侧边栏底部齿轮 button.sidebar-user-settings → 设置面板
+#   → 左栏 button.settings-nav-item:text-is('MCP')（active 态标记 .active）；
+# - 「添加服务器」表单默认**折叠**，需点右上 .btn-primary.mcp-panel-add 展开
+#   （展开后成一类 .mcp-server-card.mcp-add-card）；
+# - 传输方式 = 三个 .mcp-segmented-btn（stdio / HTTP / SSE），**stdio 默认 is-active**；
+# - stdio 字段（label 为同级文本，非 <label for>）：
+#     名称              input.settings-input[placeholder*='my-postgres']
+#     启动命令          input.settings-input.mcp-input-mono[placeholder*='npx']
+#     参数（每行一个）   textarea.mcp-input-mono 第 1 个
+#     环境变量（JSON）   textarea.mcp-input-mono 第 2 个
+#     环境变量文件(.env) input.mcp-input-mono[placeholder*='.env']
+#     启用              input[type=checkbox]
+#   保存/取消 = button.btn-primary:text-is('保存') / button.btn-settings-ghost:text-is('取消')；
+# - 已添加服务器卡片 = .mcp-server-card（.mcp-add-card 是表单，需排除）：
+#     名称 .mcp-server-name / 传输徽标 .mcp-badge-transport / 工具数 .mcp-badge-tools
+#     状态 .mcp-status-label（'未连接' | '已连接'）/ 命令 .mcp-server-meta code
+#     动作 .mcp-icon-btn（title=浏览 / 编辑 / 重新连接 / 删除；删除带 .is-danger）；
+# - **保存后不会自动连接**：新卡为「0 工具 / 未连接」，必须点「重新连接」才变
+#   「N 工具 / 已连接」（实测 3 工具）；
+# - 「浏览」展开内联面板 .mcp-browse：.mcp-segmented-btn 两标签 Resources/Prompts；
+#   条目 .mcp-browse-item（.mcp-browse-item-name / -desc / -uri），按钮 title/文本
+#   为「查看」（Resources）/「获取」（Prompts）；不支持该能力时提示
+#   .mcp-browse-hint「该服务器未提供此能力，或尚未连接」；
+# - 「N 工具」徽标**不可点击**（纯展示）；
+# - 删除按钮每卡同名 title='删除' → 动作必须限定在目标卡片内（本文件配合页面对象
+#   _card() 作用域链定位，不用全局 .first）。
+# - **删除无确认弹层**：点红色「删除」即生效，卡片 0.4s 内消失（实测 2026-10-13，
+#   无 window.confirm / 无 .modal）→ 危险动作，用例只删自己建的临时条目。
+# - **编辑为卡片原地变表单**：目标卡加 `.is-editing`，字段与添加表单同构，
+#   卡片「编辑」按钮位变「取消」，表单尾另有「保存 / 取消」（实测 2026-10-13）。
+page: desktop_mcp
+locators:
+  # ---- 入口链路 ----
+  - name: settings_button
+    source: manual
+    candidates:
+      # 侧边栏底部齿轮（title/aria = 设置）
+      - { by: css, value: "button.sidebar-user-settings" }
+      - { by: css, value: "button[aria-label='设置']" }
+  - name: nav_mcp
+    source: manual
+    candidates:
+      # 注意：导航项文本在子 span.settings-nav-label 里；:text-is 命中「最小元素」，
+      # 直接写 button:text-is 会落空（实测 0 命中）→ 必须用 :has(span:text-is(...))。
+      - { by: css, value: "button.settings-nav-item:has(span.settings-nav-label:text-is('MCP'))" }
+      - { by: css, value: ".settings-nav-item:has(.settings-nav-label:text-is('MCP'))" }
+      - { by: css, value: "button.settings-nav-item:has-text('MCP')" }
+  - name: nav_mcp_active
+    source: manual
+    candidates:
+      # 当前已停在 MCP 页的状态标记（幂等判断用）
+      - { by: css, value: "button.settings-nav-item.active:has(span.settings-nav-label:text-is('MCP'))" }
+      - { by: css, value: "button.settings-nav-item.active:has-text('MCP')" }
+  - name: sidebar_back
+    source: manual
+    candidates:
+      - { by: css, value: "button.settings-sidebar-back" }
+
+  # ---- 添加表单 ----
+  - name: add_server_button
+    source: manual
+    candidates:
+      # 展开「添加服务器」表单（表单折叠/展开两态共用入口）
+      - { by: css, value: "button.btn-primary.mcp-panel-add" }
+      - { by: text, value: 添加服务器 }
+  - name: add_card
+    source: manual
+    candidates:
+      - { by: css, value: ".mcp-server-card.mcp-add-card" }
+  - name: transport_stdio
+    source: manual
+    candidates:
+      - { by: css, value: ".mcp-segmented-btn:text-is('stdio')" }
+  - name: transport_http
+    source: manual
+    candidates:
+      - { by: css, value: ".mcp-segmented-btn:text-is('HTTP')" }
+  - name: transport_sse
+    source: manual
+    candidates:
+      - { by: css, value: ".mcp-segmented-btn:text-is('SSE')" }
+  - name: transport_active
+    source: manual
+    candidates:
+      # 当前选中的传输方式（断言 stdio 为默认选中）
+      - { by: css, value: ".mcp-add-card .mcp-segmented-btn.is-active" }
+  - name: field_name
+    source: manual
+    candidates:
+      - { by: css, value: ".mcp-add-card input.settings-input[placeholder*='my-postgres']" }
+  - name: field_command
+    source: manual
+    candidates:
+      - { by: css, value: ".mcp-add-card input.mcp-input-mono[placeholder*='npx']" }
+  - name: field_args
+    source: manual
+    candidates:
+      # 参数（每行一个）——第 1 个 textarea
+      - { by: css, value: ".mcp-add-card textarea.mcp-input-mono" }
+  - name: field_env
+    source: manual
+    candidates:
+      # 环境变量（JSON）——第 2 个 textarea
+      - { by: css, value: ".mcp-add-card textarea.mcp-input-mono" }
+  - name: field_enabled
+    source: manual
+    candidates:
+      # 「启用」复选框（默认勾选）
+      - { by: css, value: ".mcp-add-card input[type=checkbox]" }
+  - name: save_button
+    source: manual
+    candidates:
+      - { by: css, value: ".mcp-add-card button.btn-primary:text-is('保存')" }
+  - name: cancel_button
+    source: manual
+    candidates:
+      - { by: css, value: ".mcp-add-card button.btn-settings-ghost:text-is('取消')" }
+
+  # ---- 「从 mcp.json 导入」（实测 2026-10-13）----
+  # 产品行为：按钮 → 读固定路径（~/.<产品目录>/mcp.json 全局 + <workspace>/.<ProductDir>/mcp.json 项目级）
+  #   → 弹 .workspace-overlay 预览面板列「名称 (transport)」→「确认导入」按名合并（同名覆盖，从不删除）。
+  #   无文件选择器、无粘贴框；找不到文件时面板提示 .mcp-import-none。
+  - name: import_button
+    source: manual
+    candidates:
+      - { by: css, value: "button.mcp-panel-add.btn-settings-ghost:has-text('mcp.json')" }
+      - { by: text, value: "从 mcp.json 导入" }
+  - name: import_panel
+    source: manual
+    candidates:
+      # 预览区**精确**容器（实测 2026-10-13）：.mcp-import-preview 内含
+      #   h5.mcp-add-card-title「导入预览」+ ul.mcp-import-list > li.mcp-import-item
+      # 注意：不要用 .workspace-overlay —— 它是整页包裹层，会把既存卡片名也算进来。
+      - { by: css, value: ".mcp-import-preview" }
+      - { by: css, value: ".mcp-import-list" }
+  - name: import_preview_item
+    source: manual
+    candidates:
+      # 预览条目（形如「apw-json-imported (stdio)」）
+      - { by: css, value: ".mcp-import-preview li.mcp-import-item" }
+      - { by: css, value: ".mcp-import-list li" }
+  - name: import_confirm_button
+    source: manual
+    candidates:
+      - { by: css, value: ".mcp-import-preview button.btn-primary:text-is('确认导入')" }
+      - { by: css, value: "button.btn-primary:text-is('确认导入')" }
+  - name: import_cancel_button
+    source: manual
+    candidates:
+      - { by: css, value: ".mcp-import-preview button.btn-settings-ghost:text-is('取消')" }
+  - name: import_none_hint
+    source: manual
+    candidates:
+      # 未找到 mcp.json 的提示（「未找到 mcp.json（项目 .<ProductDir>/mcp.json 或 ~/.<产品目录>/mcp.json）」）
+      - { by: css, value: ".mcp-panel:has-text('未找到 mcp.json')" }
+      - { by: text, value: "未找到 mcp.json" }
+
+  # ---- 编辑态（卡片原地变表单，实测 2026-10-13）----
+  # 产品行为：点「编辑」→ 该卡加 .is-editing，字段与添加表单同构；
+  #   卡片动作按钮变为「取消」（原「编辑」位），表单尾另有「保存 / 取消」。
+  - name: editing_card
+    source: manual
+    candidates:
+      - { by: css, value: ".mcp-server-card.is-editing" }
+  - name: edit_name
+    source: manual
+    candidates:
+      - { by: css, value: ".mcp-server-card.is-editing input.settings-input[placeholder*='my-postgres']" }
+  - name: edit_command
+    source: manual
+    candidates:
+      - { by: css, value: ".mcp-server-card.is-editing input.mcp-input-mono[placeholder*='npx']" }
+  - name: edit_args
+    source: manual
+    candidates:
+      - { by: css, value: ".mcp-server-card.is-editing textarea.mcp-input-mono" }
+  - name: edit_save_button
+    source: manual
+    candidates:
+      - { by: css, value: ".mcp-server-card.is-editing button.btn-primary:text-is('保存')" }
+  - name: edit_cancel_button
+    source: manual
+    candidates:
+      - { by: css, value: ".mcp-server-card.is-editing button.btn-settings-ghost:text-is('取消')" }
+
+
+  # ---- 服务器卡片（.mcp-add-card 需排除）----
+  - name: server_card
+    source: manual
+    candidates:
+      - { by: css, value: ".mcp-server-card:not(.mcp-add-card)" }
+  - name: server_name
+    source: manual
+    candidates:
+      - { by: css, value: ".mcp-server-card .mcp-server-name" }
+  - name: server_badge_transport
+    source: manual
+    candidates:
+      - { by: css, value: ".mcp-server-card .mcp-badge-transport" }
+  - name: server_badge_tools
+    source: manual
+    candidates:
+      # 「N 工具」徽标（纯展示，不可点击）
+      - { by: css, value: ".mcp-server-card .mcp-badge-tools" }
+  - name: server_status
+    source: manual
+    candidates:
+      - { by: css, value: ".mcp-server-card .mcp-status-label" }
+  - name: server_command
+    source: manual
+    candidates:
+      # 卡片内命令行回显（启动命令 + 参数）
+      - { by: css, value: ".mcp-server-card .mcp-server-meta code" }
+  - name: card_browse_button
+    source: manual
+    candidates:
+      - { by: css, value: ".mcp-server-card button.mcp-icon-btn[title='浏览']" }
+  - name: card_reconnect_button
+    source: manual
+    candidates:
+      - { by: css, value: ".mcp-server-card button.mcp-icon-btn[title='重新连接']" }
+  - name: card_edit_button
+    source: manual
+    candidates:
+      - { by: css, value: ".mcp-server-card button.mcp-icon-btn[title='编辑']" }
+  - name: card_delete_button
+    source: manual
+    candidates:
+      # 危险动作：必须限定在目标卡片内（每卡同名）
+      - { by: css, value: ".mcp-server-card button.mcp-icon-btn.is-danger[title='删除']" }
+  - name: reconnect_failed_hint
+    source: manual
+    candidates:
+      # 连接失败时的兜底提示（若产品渲染任何告警文本）
+      - { by: css, value: ".mcp-server-card [class*='error'], .mcp-server-card [class*='warn']" }
+
+  # ---- 浏览面板（Resources / Prompts 详情）----
+  - name: browse_panel
+    source: manual
+    candidates:
+      - { by: css, value: ".mcp-browse" }
+  - name: browse_tab_resources
+    source: manual
+    candidates:
+      - { by: css, value: ".mcp-browse .mcp-segmented-btn:text-is('Resources')" }
+  - name: browse_tab_prompts
+    source: manual
+    candidates:
+      - { by: css, value: ".mcp-browse .mcp-segmented-btn:text-is('Prompts')" }
+  - name: browse_refresh
+    source: manual
+    candidates:
+      - { by: css, value: ".mcp-browse button.mcp-icon-btn[title='刷新']" }
+  - name: browse_item
+    source: manual
+    candidates:
+      - { by: css, value: ".mcp-browse-item" }
+  - name: browse_item_name
+    source: manual
+    candidates:
+      - { by: css, value: ".mcp-browse-item-name" }
+  - name: browse_item_desc
+    source: manual
+    candidates:
+      - { by: css, value: ".mcp-browse-item-desc" }
+  - name: browse_item_uri
+    source: manual
+    candidates:
+      - { by: css, value: ".mcp-browse-item-uri" }
+  - name: browse_item_action
+    source: manual
+    candidates:
+      # 条目动作：Resources='查看' / Prompts='获取'
+      - { by: css, value: ".mcp-browse-item button" }
+  - name: browse_hint
+    source: manual
+    candidates:
+      - { by: css, value: ".mcp-browse-hint" }
+  - name: browse_detail
+    source: manual
+    candidates:
+      # 「查看」后内联展开的详情正文区（资源内容 / 提示词渲染结果）
+      - { by: css, value: ".mcp-browse pre, .mcp-browse [class*='detail'], .mcp-browse [class*='content']" }
+
+  # ---- 对话页（工具调用证据）----
+  - name: msg_tools
+    source: manual
+    candidates:
+      # 助手消息里的工具调用区（Called N tool(s) 分组）
+      - { by: css, value: ".msg-tools" }
+  - name: msg_tool_group_header
+    source: manual
+    candidates:
+      - { by: css, value: ".msg-tool-group-header" }
+  - name: msg_tool_title
+    source: manual
+    candidates:
+      - { by: css, value: ".msg-tool-title" }
+  - name: msg_tool_preview
+    source: manual
+    candidates:
+      # 工具名预览片段（实测被截断为 'apw'，仅作在场性证据）
+      - { by: css, value: ".msg-tool-preview" }

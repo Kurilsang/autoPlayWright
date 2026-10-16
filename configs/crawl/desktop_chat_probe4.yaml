@@ -1,0 +1,22 @@
+# 桌面客户端 Thought 展开交互探查（生成侧资产）：
+# 在现有会话（已有 Thought 折叠块）上点击 summary，采集展开前后 DOM：
+# 核对 details[open]、思考正文渲染形态与定位器候选。零推理消耗。
+name: desktop-chat-probe4
+targets:
+  - id: desktop-thinking-expand
+    route: ""
+    steps:
+      - do: { page: probe, action: dump_dom, args: { name: "desktop_thinking_collapsed" } }
+        label: dom_collapsed
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "details.msg-thinking summary" }, timeout_ms: 5000 } }
+        label: expand_thinking
+        capture: true
+      - do: { page: probe, action: wait, args: { ms: 800 } }
+        label: settle_expand
+      - do: { page: probe, action: dump_dom, args: { name: "desktop_thinking_expanded" } }
+        label: dom_expanded
+    signals:
+      - name: thinking
+        selector: { by: css, value: "details.msg-thinking" }
+      - name: thinking_open
+        selector: { by: css, value: "details.msg-thinking[open]" }

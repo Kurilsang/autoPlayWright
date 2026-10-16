@@ -1,0 +1,34 @@
+# Skills 广场链路用例：私人 skill 上传回显/预览 + 广场下载 + 筛选标签核对。
+# 硬红线：只上传 🔒私人（scope=private），绝不上传 🌐公共/点「设为公开」（污染公开库）；
+# 另核对私人 skill 不泄漏进公开列表。断言全部为确定性内容（回显/激活态/组件渲染）。
+meta:
+  id: skill-market-upload-download
+  name: Skills 广场：私人 skill 上传回显/预览 + 广场下载与筛选标签
+  platforms: [web]
+  envs: [test]
+  tags: [P0, skill, market]
+  owner: qa
+steps:
+  - do: { page: aml_chat, action: select_agent_mode, args: { mode: "专家模式", timeout_ms: 3000 } }
+  - do: { page: aml_chat, action: dismiss_onboarding, args: {} }
+  - do: { page: skill_market, action: open_plaza, args: {} }
+  # ---- 上传私人 skill（动作内含可见性硬红线核对）----
+  - do: { page: skill_market, action: upload_private_skill, args: { name: "apw-skill-caseA 甲甲甲 111", description: "apw 私人 skill 回显用例A 甲甲甲 111" } }
+  # ---- 回显核对：我的页签出现该 skill（名称/描述回显 + 🔒私人徽标）----
+  - do: { page: skill_market, action: verify_mine_echo, args: { name: "apw-skill-caseA 甲甲甲 111", description: "apw 私人 skill 回显用例A 甲甲甲 111" } }
+  # ---- 预览核对：弹层内名称/描述回显 ----
+  - do: { page: skill_market, action: preview_skill, args: { name: "apw-skill-caseA 甲甲甲 111", description: "apw 私人 skill 回显用例A 甲甲甲 111" } }
+  - assert: { type: visible, page: skill_market, target: preview_modal }
+  - assert: { type: text_contains, page: skill_market, target: preview_modal, expected: "apw 私人 skill 回显用例A 甲甲甲 111" }
+  - do: { page: skill_market, action: close_preview, args: {} }
+  # ---- 公开库不被污染：私人 skill 不得出现在套组公开列表 ----
+  - do: { page: skill_market, action: verify_not_public, args: { name: "apw-skill-caseA 甲甲甲 111" } }
+  # ---- 筛选标签核对：排序激活态逐个迁移 + 列表非空 ----
+  - do: { page: skill_market, action: check_sort, args: { label: "最新" } }
+  - do: { page: skill_market, action: check_sort, args: { label: "最近更新" } }
+  - do: { page: skill_market, action: check_sort, args: { label: "热度" } }
+  # ---- 广场下载：成功信号 = 下载事件(.zip) 或 我的计数增长 ----
+  - do: { page: skill_market, action: download_skill, args: {} }
+  - do: { page: skill_market, action: open_tab, args: { tab: "mine" } }
+  - assert: { type: visible, page: skill_market, target: skill_card }
+  - judge: { note: "v1 预留：skill 内容质量由 LLM-as-Judge 判定" }

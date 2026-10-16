@@ -1,0 +1,122 @@
+# 报告样式库（/templates：列表 + 预览弹层 + 做同款跳转后的工作流编辑器）。
+# 由 report_style_probe{,2} + workspace 探查产物（2026-09-29）生成，人工审核入库。
+# 真实应用无 data-testid；候选按稳定文本/属性 → css 兜底书写。
+# 产品事实：
+# - 入口 = 侧边栏「更多场景」→ 场景卡「报告样式库」（h1 同名，入口用按钮壳限定）；
+# - 标签筛选条 = 圆角 pill chips，激活态 bg-gray-900（light/dark 类名都在，模式无关）；
+# - 样式卡 = div.group.rounded-xl（缩略 iframe title=<类目>-<变体>，如 jira-A）；
+# - 卡片「预览」与「做同款」打开同一预览弹层（头部：做同款/新标签打开/关闭 + 全页 iframe）；
+# - 弹层「做同款」= 一键复制官方示例工作流并跳转 /workflows/<uuid>（实测同页跳转，
+#   弹窗形态由页面对象注意力转移兜底）；副本名含「官方模板」与「(Fork)」。
+page: report_style
+locators:
+  # ---- 入口：侧边栏「更多场景」→ 场景卡 ----
+  - name: nav_more_scenes
+    source: ai
+    candidates:
+      - { by: text, value: 更多场景 }                       # 侧边栏入口（场景画廊）
+  - name: nav_report_style
+    source: manual
+    candidates:
+      - { by: css, value: "button:has(span:text-is('报告样式库'))" }   # 场景卡按钮（入口语义）
+      - { by: text, value: 报告样式库 }
+  # ---- 列表页 ----
+  - name: page_title
+    source: manual
+    candidates:
+      - { by: css, value: "h1:text-is('报告样式库')" }
+  - name: page_subtitle
+    source: manual
+    candidates:
+      - { by: css, value: "h1 + p" }                        # 「8 类 28 套 · …」（仅作证据，数量会演进）
+  - name: tag_bar
+    source: manual
+    candidates:
+      - { by: css, value: "div.flex.flex-wrap.gap-2.px-6.pb-4" }   # 标签筛选条容器
+  - name: tag_chip
+    source: manual
+    candidates:
+      - { by: css, value: "button.rounded-full" }           # 标签筛选 pill（按文本取具体 chip）
+  - name: tag_chip_active
+    source: manual
+    candidates:
+      - { by: css, value: "button.rounded-full.bg-gray-900" }   # 激活标签（bg-gray-900 光暗模式类名都在）
+  - name: style_card
+    source: manual
+    candidates:
+      - { by: css, value: "div.group.rounded-xl" }          # 样式卡壳（filter(has_text=变体) 定位具体卡）
+  - name: style_section_title
+    source: manual
+    candidates:
+      - { by: css, value: "main section h2" }               # 分组标题 = 标签名（筛选生效的确定性信号）
+  - name: style_card_thumb
+    source: manual
+    candidates:
+      - { by: css, value: "button[title='点击预览']" }       # 缩略图预览按钮（卡内）
+  # ---- 预览弹层（头部动作：做同款/新标签打开/关闭；body=全页样式 iframe）----
+  - name: preview_modal
+    source: manual
+    candidates:
+      - { by: css, value: "div.fixed.inset-0:has(iframe[title^='preview-'])" }
+  - name: preview_iframe
+    source: manual
+    candidates:
+      - { by: css, value: "iframe[title^='preview-']" }     # title=preview-<类目>-<变体>
+  - name: preview_copy_button
+    source: manual
+    candidates:
+      - { by: css, value: "div.fixed.inset-0:has(iframe[title^='preview-']) button:text-is('做同款')" }
+  - name: preview_new_tab_button
+    source: manual
+    candidates:
+      - { by: css, value: "div.fixed.inset-0:has(iframe[title^='preview-']) button:text-is('新标签打开')" }
+  - name: preview_close_button
+    source: manual
+    candidates:
+      - { by: css, value: "div.fixed.inset-0:has(iframe[title^='preview-']) button:text-is('关闭')" }
+  # ---- 做同款跳转后：工作流编辑器（官方示例副本，/workflows/<uuid>）----
+  - name: wf_name_input
+    source: ai
+    candidates:
+      - { by: css, value: "input.text-base.font-semibold" }   # 顶栏名称输入框（value=副本名）
+  - name: saved_badge
+    source: ai
+    candidates:
+      - { by: text, value: 已保存 }
+  - name: run_button
+    source: ai
+    candidates:
+      - { by: role, value: button, name: "运行", exact: true }
+  - name: cancel_run_button
+    source: ai
+    candidates:
+      - { by: text, value: 取消运行 }
+  - name: run_done_marker
+    source: manual
+    candidates:
+      - { by: css, value: "div.break-all.leading-relaxed:has-text('✅ 工作流完成')" }   # 日志完成行
+  - name: run_output_keys_marker
+    source: manual
+    candidates:
+      - { by: css, value: "div.break-all.leading-relaxed:has-text('输出键')" }          # 结构化输出键行
+  - name: run_status_badge
+    source: manual
+    candidates:
+      - { by: css, value: "span.rounded-full:text-is('completed')" }                    # 运行态徽标
+  - name: run_log
+    source: manual
+    candidates:
+      - { by: css, value: "div.font-mono.text-xs.select-text" }                         # 日志终端容器（稳定性采样）
+  # ---- 工作区最终结果：工作流产物面板 ----
+  - name: artifacts_panel_title
+    source: manual
+    candidates:
+      - { by: text, value: 工作流产物 }
+  - name: artifacts_placeholder
+    source: manual
+    candidates:
+      - { by: text, value: 运行完成后显示产物 }              # 占位（落位后应消失，count=0）
+  - name: artifact_row
+    source: manual
+    candidates:
+      - { by: css, value: "div.group:has(a[title='下载'])" }  # 产物行（文件名 + 大小 · 产物/中间文件）

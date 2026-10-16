@@ -1,0 +1,23 @@
+# 套组广场第 4 轮探查（生成侧资产）：套组卡片「单击预览」的预览表面结构。
+# 卡片 title="单击预览，双击套用"；只看结构不做套用（双击绝不触发）。
+# 产物落 .scratch/autoPlayWright/snapshots/<env>/（gitignored，落盘自动脱敏）。
+name: suite-probe4
+targets:
+  - id: suite-preview
+    route: /
+    steps:
+      - do: { page: aml_chat, action: select_agent_mode, args: { mode: "专家模式", timeout_ms: 3000 } }
+        label: load_popups_dismissed
+      - do: { page: aml_chat, action: dismiss_onboarding, args: {} }
+        label: popups_dismissed
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "专家套组广场", exact: true }, optional: true, timeout_ms: 5000 } }
+        label: nav_suite_plaza
+      # ---- 单击首卡（预览）；css title 属性定位，绝不双击 ----
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "main div[title='单击预览，双击套用']" }, timeout_ms: 5000 } }
+        label: open_preview
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "suite_preview" } }
+        label: dom_preview
+    signals:
+      - name: history_loading
+        selector: { by: text, value: 加载对话历史中, exact: false }

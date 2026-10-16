@@ -1,0 +1,9 @@
+# 桌面客户端（Electron 打包的 Web 界面）执行环境：CDP attach 本地运行的客户端。
+# 启动客户端（带调试端口）后再跑：
+#   <客户端安装目录>\<app>.exe --remote-debugging-port=9333
+# base_url 留空 = 不导航（客户端启动即在其 UI）；填写则当作客户端内起始路由。
+base_url: ""
+driver:
+  mode: electron
+  electron:
+    cdp_endpoint: http://127.0.0.1:9333

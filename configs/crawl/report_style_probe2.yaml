@@ -1,0 +1,40 @@
+# 报告样式库第 2 轮探查（生成侧资产）：入口修正——侧边栏「更多场景」（首轮「更多」误中会话行 ⋯）。
+# 目标：更多场景菜单结构 → 报告样式库列表页（标签筛选条/卡片/预览/做同款按钮）。
+# 产物落 .scratch/autoPlayWright/snapshots/<env>/（gitignored，落盘自动脱敏）。
+name: report-style-probe2
+targets:
+  - id: report-style-lib2
+    route: /
+    steps:
+      - do: { page: aml_chat, action: select_agent_mode, args: { mode: "专家模式", timeout_ms: 3000 } }
+        label: load_popups_dismissed
+      - do: { page: aml_chat, action: dismiss_onboarding, args: {} }
+        label: popups_dismissed
+      # 残留提示层（新功能条/知晓按钮）先清，防拦截点击
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "先收起（本次登录内不再弹出）", exact: true }, optional: true, timeout_ms: 3000 } }
+        label: dismiss_whatsnew
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "我已知晓", exact: true }, optional: true, timeout_ms: 3000 } }
+        label: dismiss_ack
+      # ---- 入口：侧边栏「更多场景」----
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "更多场景", exact: true }, optional: true, timeout_ms: 5000 } }
+        label: open_more_scenes
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "more_scenes_menu" } }
+        label: dom_more_scenes
+      # ---- 报告样式库入口 ----
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "报告样式库", exact: true }, optional: true, timeout_ms: 5000 } }
+        label: nav_report_style
+        capture: true
+      - do: { page: probe, action: wait, args: { ms: 1800 } }
+        label: settle_list
+      - do: { page: probe, action: dump_dom, args: { name: "report_style_home2" } }
+        label: dom_style_home
+      # ---- 预览（exact 防误中；未命中静默跳过）----
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "预览", exact: true }, optional: true, timeout_ms: 4000 } }
+        label: try_preview
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "style_preview2" } }
+        label: dom_preview
+    signals:
+      - name: history_loading
+        selector: { by: text, value: 加载对话历史中, exact: false }

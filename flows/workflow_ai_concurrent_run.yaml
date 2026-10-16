@@ -1,0 +1,22 @@
+# 工作流：AI 编码并发场景二——2 个 AI 运行任务同时发布，校验 UI 并发态正常。
+# 逐标签核对（同处「取消运行」→各自「工作流完成」→身份回显）在页面对象内完成，异常即冻结取证。
+# 并发规模 2：后端 LLM 限流（3~5 并发即限流），控制规模防偶发失败污染结论。
+meta:
+  id: workflow-ai-concurrent-run
+  name: 工作流：并发发布 2 个 AI 运行任务 UI 校验
+  platforms: [web]
+  envs: [test]
+  tags: [P2, workflow, ai-coding, concurrency]
+  owner: qa
+steps:
+  - do:
+      page: aml_workflow
+      action: run_tasks_concurrently
+      args:
+        names: ["apw-ui-test-conc-run-a", "apw-ui-test-conc-run-b"]
+        prompt: "写一个最简工作流：打印 hello"
+        timeout_ms: 300000
+  - assert: { type: visible, page: aml_workflow, target: run_done_marker }
+  - assert: { type: text_contains, page: aml_workflow, target: run_started_name_line, expected: "apw-ui-test-conc-run-a" }
+  - do: { page: aml_workflow, action: capture_context, args: {} }
+  - judge: { note: "v1 预留：并发运行产物质量由 LLM-as-Judge 判定" }

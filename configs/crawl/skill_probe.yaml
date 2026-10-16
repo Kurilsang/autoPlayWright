@@ -1,0 +1,31 @@
+# Skills 广场（skill 下载/上传）首轮探查配置（生成侧资产）：
+# 找广场入口、筛选标签、skill 卡片/预览、上传入口的页面结构。
+# 探查期用 probe 保留名的通用原语推进状态；页面对象产品化后把 probe 步骤
+# 替换为 page: skill_market 的动作（参考 configs/crawl/aml_chat.yaml）。
+# 产物落 .scratch/autoPlayWright/snapshots/<env>/（gitignored，落盘自动脱敏）。
+name: skill-probe
+targets:
+  - id: skill-market
+    route: /
+    steps:
+      # 真实环境常见拦截层（延迟弹窗/新手引导），先幂等清掉
+      - do: { page: aml_chat, action: select_agent_mode, args: { mode: "专家模式", timeout_ms: 3000 } }
+        label: load_popups_dismissed
+      - do: { page: aml_chat, action: dismiss_onboarding, args: {} }
+        label: popups_dismissed
+        capture: true
+      # ---- Skills 广场入口（侧边栏）----
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "Skills 广场", exact: true }, optional: true, timeout_ms: 5000 } }
+        label: nav_skill_plaza
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "skill_plaza_home" } }
+        label: dom_plaza_home
+      # ---- 上传入口候选（exact 防误中会话区「上传文件」；未命中静默跳过）----
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "上传", exact: true }, optional: true, timeout_ms: 4000 } }
+        label: try_upload_entry
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "skill_upload_entry" } }
+        label: dom_upload_entry
+    signals:
+      - name: history_loading
+        selector: { by: text, value: 加载对话历史中, exact: false }

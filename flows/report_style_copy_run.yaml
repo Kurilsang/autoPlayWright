@@ -1,0 +1,32 @@
+# 报告样式库核心链路：进入 → 标签筛选 → 预览 → 做同款跳转 → 运行 → 工作区最终结果。
+# 运行 = AI 长任务，完成判定六信号（取消键消失/完成行/输出键/状态 completed/产物落位/日志稳定）。
+# 硬红线：运行参数绝不填 recipients（留空=不发邮件）；不动「分享/Fork/锁定/用户视图」；不做公开性变更。
+# 断言全部为确定性内容（组件渲染/结构收敛/产物行落位），不断言 LLM 措辞。
+meta:
+  id: report-style-copy-run
+  name: 报告样式库：做同款跳转 + 运行出工作区最终结果（Jira A · Editorial）
+  platforms: [web]
+  envs: [test]
+  tags: [P0, report_style, market]
+  owner: qa
+steps:
+  - do: { page: aml_chat, action: select_agent_mode, args: { mode: "专家模式", timeout_ms: 3000 } }
+  - do: { page: aml_chat, action: dismiss_onboarding, args: {} }
+  # ================= 进入 + 标签筛选 + 预览 =================
+  - do: { page: report_style, action: open_library, args: {} }
+  - do: { page: report_style, action: switch_tag, args: { label: "Jira 问题跟进" } }
+  - assert: { type: visible, page: report_style, target: style_card }
+  - do: { page: report_style, action: open_preview, args: { variant: "A · Editorial" } }
+  - assert: { type: visible, page: report_style, target: preview_modal }
+  - assert: { type: visible, page: report_style, target: preview_iframe }
+  - do: { page: report_style, action: close_preview, args: {} }
+  # ================= 做同款：复制官方示例工作流并跳转 =================
+  - do: { page: report_style, action: copy_template, args: { variant: "A · Editorial", timeout_ms: 20000 } }
+  - assert: { type: visible, page: report_style, target: run_button }
+  # ================= 运行（AI 长任务，六信号判完成）=================
+  - do: { page: report_style, action: run_workflow, args: { timeout_ms: 300000 } }
+  # ================= 工作区最终结果：工作流产物落位 =================
+  - do: { page: report_style, action: verify_artifacts, args: { min_count: 1 } }
+  - assert: { type: visible, page: report_style, target: artifacts_panel_title }
+  - assert: { type: visible, page: report_style, target: artifact_row }
+  - judge: { note: "v1 预留：报告成文质量由 LLM-as-Judge 判定" }

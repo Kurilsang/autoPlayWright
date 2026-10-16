@@ -1,0 +1,9 @@
+# 脱敏映射模板：复制为 configs/sanitize.local.yaml（gitignored）后填真实串。
+# 规则：
+# - 左侧为快照产物里出现的敏感串（产品名/账号/内网主机名/个人信息），原样精确书写
+# - 右侧为约定占位符：<product>（产品名）、<user-me>/<user-*>（账号）、<host>（主机）
+# - 长键优先替换；新增条目即生效，无需改代码
+# - 通用模式自动兜底（无需配置）：邮件/账号句柄 → <user>，http(s) 主机 → <host>（路径保留）
+<product-name>: <product>
+<user-account>: <user-me>
+<internal-hostname>: <host>

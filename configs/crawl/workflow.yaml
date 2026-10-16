@@ -1,0 +1,29 @@
+# 工作流功能页面状态快照（票 06 产品化配置）：编辑器关键状态逐状态采集。
+# 入口：/workflows（侧边栏「任务」→「工作流」）。探查期配置见 workflow_probe.yaml。
+# 产物落 .scratch/autoPlayWright/snapshots/<env>/（gitignored），喂 LLM 草稿生成（票 07）。
+name: workflow
+targets:
+  - id: workflow-states
+    route: /workflows
+    steps:
+      - do: { page: aml_workflow, action: new_workflow, args: { name: "apw-crawl", visibility: "私有" } }
+        label: new_workflow_empty
+        capture: true
+      - do: { page: aml_workflow, action: type_script, args: {} }
+        label: script_saved
+        capture: true
+      - do: { page: aml_workflow, action: start_run, args: {} }
+        label: run_started
+        capture: true
+      - do: { page: aml_workflow, action: wait_run_done, args: { timeout_ms: 120000 } }
+        label: run_done
+        capture: true
+    signals:
+      - name: saved_badge
+        selector: { by: text, value: 已保存 }
+      - name: script_empty_marker
+        selector: { by: text, value: 暂无脚本, exact: false }
+      - name: cancel_run_button
+        selector: { by: text, value: 取消运行 }
+      - name: run_done_marker
+        selector: { by: text, value: 工作流完成, exact: false }

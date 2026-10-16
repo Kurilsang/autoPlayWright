@@ -1,0 +1,105 @@
+# 工作流编辑页（真实环境，/workflows 与 /workflows/<id>）。由 AI 探查页面结构生成，人工审核入库。
+# 真实应用无 data-testid，候选优先稳定文案/语义属性（placeholder/role/text），结构性 css 兜底。
+page: aml_workflow
+locators:
+  # ---- 导航：侧边栏「任务」展开子菜单 →「工作流」----
+  - name: nav_tasks
+    source: ai
+    candidates:
+      - { by: text, value: 任务 }
+  - name: nav_workflow
+    source: ai
+    candidates:
+      - { by: text, value: 工作流, exact: true }
+  # ---- 列表页：新建工作流弹窗 ----
+  - name: new_workflow_button
+    source: ai
+    candidates:
+      - { by: text, value: 新建工作流 }
+  - name: wf_dialog_name_input
+    source: ai
+    candidates:
+      - { by: placeholder, value: "例如：Jira 工单批量三检" }
+  - name: wf_visibility_public
+    source: ai
+    candidates:
+      - { by: css, value: "div.fixed.inset-0 button:text-is('公开（广场可见）')" }   # 限定新建弹窗内（列表卡片也有「私有/公开」角标）
+      - { by: text, value: 公开（广场可见） }
+  - name: wf_visibility_private
+    source: ai
+    candidates:
+      - { by: css, value: "div.fixed.inset-0 button:text-is('私有')" }
+      - { by: text, value: 私有 }
+  - name: wf_create_button
+    source: ai
+    candidates:
+      - { by: css, value: "div.fixed.inset-0 button:text-is('创建')" }
+      - { by: text, value: 创建 }
+  # ---- 编辑器 ----
+  - name: wf_title_input
+    source: ai
+    candidates:
+      - { by: css, value: "input.text-base.font-semibold" }   # 顶栏名称输入框（value=工作流名，视觉截断但值完整）
+  - name: code_edit_toggle
+    source: ai
+    candidates:
+      - { by: text, value: 编辑 }
+  - name: code_input
+    source: ai
+    candidates:
+      - { by: css, value: "textarea[spellcheck='false']" }   # 「编辑」态代码输入区（编辑器唯一 spellcheck=false textarea）
+  - name: save_button
+    source: ai
+    candidates:
+      - { by: role, value: button, name: 保存工作流 }
+      - { by: text, value: 保存工作流 }
+  - name: saved_badge
+    source: ai
+    candidates:
+      - { by: text, value: 已保存 }
+  - name: flow_node_hello
+    source: manual
+    candidates:
+      - { by: text, value: 打印 hello }   # 固定脚本 wf.step 标题（流程节点，非 AI 用例确定性锚点）
+  - name: script_empty_marker
+    source: ai
+    candidates:
+      - { by: text, value: 暂无脚本, exact: false }   # 编辑器空态占位
+  # ---- AI 编写面板 ----
+  - name: ai_prompt_input
+    source: ai
+    candidates:
+      - { by: placeholder, value: "例如：按给定 JQL 批量取回 Jira 工单，逐条判定类型/优先级并复核，最后汇总成 Markdown 报告…" }
+  - name: generate_button
+    source: ai
+    candidates:
+      - { by: text, value: 生成工作流 }
+  - name: gen_running_marker
+    source: ai
+    candidates:
+      - { by: text, value: AI 正在生成工作流, exact: false }   # 生成中横幅/提示（App 组件）
+  - name: gen_done_marker
+    source: ai
+    candidates:
+      - { by: text, value: 更新工作流 }   # 面板进入迭代态 = 生成已应用（App 组件状态）
+  # ---- 运行区 ----
+  - name: run_button
+    source: ai
+    candidates:
+      - { by: role, value: button, name: "运行" }
+  - name: cancel_run_button
+    source: ai
+    candidates:
+      - { by: text, value: 取消运行 }
+  - name: run_done_marker
+    source: ai
+    candidates:
+      - { by: text, value: 工作流完成, exact: false }   # 运行日志完成行（App 组件）
+  - name: run_started_name_line
+    source: ai
+    candidates:
+      - { by: css, value: "div.break-all.leading-relaxed:has-text('工作流开始')" }   # 日志首行含工作流名（输入回显）
+  - name: run_log_hello
+    source: manual
+    candidates:
+      - { by: css, value: "div.break-all.leading-relaxed:has-text('hello')" }   # 固定脚本日志输出行

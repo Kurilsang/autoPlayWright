@@ -1,0 +1,53 @@
+# 操练场第 3 轮探查（生成侧资产）：「进入调试」IDE 面——工作模式切换 + 对话调试形态与回复完成信号。
+# 用现有会话卡（绑 apw套组caseC）进 IDE 探查，不新建会话；发送一条简单调试消息后分时采样。
+# 产物落 .scratch/autoPlayWright/snapshots/<env>/（gitignored，落盘自动脱敏）。
+name: playground-probe3
+targets:
+  - id: playground-ide
+    route: /
+    steps:
+      - do: { page: aml_chat, action: select_agent_mode, args: { mode: "专家模式", timeout_ms: 3000 } }
+        label: load_popups_dismissed
+      - do: { page: aml_chat, action: dismiss_onboarding, args: {} }
+        label: popups_dismissed
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "更多场景", exact: true }, optional: true, timeout_ms: 5000 } }
+        label: open_more_scenes
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "button:has(span:text-is('操练场'))" }, optional: true, timeout_ms: 5000 } }
+        label: nav_playground
+      - do: { page: probe, action: wait, args: { ms: 1500 } }
+        label: settle_playground
+      # ---- 进入调试（现有会话卡）----
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "进入调试", exact: true }, optional: true, timeout_ms: 5000 } }
+        label: enter_ide
+        capture: true
+      - do: { page: probe, action: wait, args: { ms: 2000 } }
+        label: settle_ide
+      - do: { page: probe, action: dump_dom, args: { name: "pg_ide_home" } }
+        label: dom_ide_home
+      # ---- 模式切换（测试模式 / Agent 助手模式）----
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "测试模式", exact: true }, optional: true, timeout_ms: 4000 } }
+        label: try_test_mode
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "pg_ide_test_mode" } }
+        label: dom_ide_test_mode
+      # ---- 简单对话调试：输入并发送 ----
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "textarea" }, optional: true, timeout_ms: 4000 } }
+        label: focus_input
+      - do: { page: probe, action: type, args: { selector: { by: css, value: "textarea" }, text: "apw 调试：请用一句话总结你能做什么", optional: true, timeout_ms: 4000 } }
+        label: type_debug_msg
+      - do: { page: probe, action: press, args: { key: "Enter", optional: true, timeout_ms: 3000 } }
+        label: send_debug_msg
+        capture: true
+      - do: { page: probe, action: wait, args: { ms: 8000 } }
+        label: t8
+        capture: true
+      - do: { page: probe, action: wait, args: { ms: 12000 } }
+        label: t20
+        capture: true
+      - do: { page: probe, action: wait, args: { ms: 20000 } }
+        label: t40
+      - do: { page: probe, action: dump_dom, args: { name: "pg_ide_reply" } }
+        label: dom_ide_reply
+    signals:
+      - name: history_loading
+        selector: { by: text, value: 加载对话历史中, exact: false }

@@ -1,0 +1,27 @@
+# 套组广场第 1 轮探查（生成侧资产）：找「专家套组广场」入口、广场结构、「我的」页签、
+# 两个新建入口（广场右上角 / 我的页内）的真身；只看结构不提交（新建表单单看不建）。
+# 产物落 .scratch/autoPlayWright/snapshots/<env>/（gitignored，落盘自动脱敏）。
+name: suite-probe
+targets:
+  - id: suite-plaza
+    route: /
+    steps:
+      - do: { page: aml_chat, action: select_agent_mode, args: { mode: "专家模式", timeout_ms: 3000 } }
+        label: load_popups_dismissed
+      - do: { page: aml_chat, action: dismiss_onboarding, args: {} }
+        label: popups_dismissed
+      # ---- 套组广场入口（侧边栏）----
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "专家套组广场", exact: true }, optional: true, timeout_ms: 5000 } }
+        label: nav_suite_plaza
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "suite_plaza_home" } }
+        label: dom_plaza_home
+      # ---- 我的页签（页签带计数徽标，css has-text 定位）----
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "button.border-b-2:has-text('我的')" }, optional: true, timeout_ms: 4000 } }
+        label: open_my_tab
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "suite_my" } }
+        label: dom_my
+    signals:
+      - name: history_loading
+        selector: { by: text, value: 加载对话历史中, exact: false }

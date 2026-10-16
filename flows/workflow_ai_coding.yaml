@@ -1,0 +1,23 @@
+# 工作流：AI 编码（「AI 编写」提交需求生成工作流）→ 运行。
+# 断言全部为确定性内容（组件状态/完成标记/输入回显）；AI 生成的脚本措辞只进证据，不作断言。
+meta:
+  id: workflow-ai-coding
+  name: 工作流：AI 编写生成工作流并运行
+  platforms: [web]
+  envs: [test]
+  tags: [P1, workflow, ai-coding]
+  owner: qa
+steps:
+  - do: { page: aml_workflow, action: new_workflow, args: { name: "apw-ui-test-ai", visibility: "私有" } }
+  - do:
+      page: aml_workflow
+      action: generate_ai
+      args: { prompt: "写一个最简工作流：打印 hello", timeout_ms: 180000 }
+  - assert: { type: visible, page: aml_workflow, target: gen_done_marker }
+  - assert: { type: visible, page: aml_workflow, target: saved_badge }
+  - do: { page: aml_workflow, action: start_run, args: {} }
+  - do: { page: aml_workflow, action: wait_run_done, args: { timeout_ms: 180000 } }
+  - do: { page: aml_workflow, action: capture_context, args: {} }
+  - assert: { type: visible, page: aml_workflow, target: run_done_marker }
+  - assert: { type: text_contains, page: aml_workflow, target: run_started_name_line, expected: "apw-ui-test-ai" }
+  - judge: { note: "v1 预留：生成脚本质量由 LLM-as-Judge 判定" }

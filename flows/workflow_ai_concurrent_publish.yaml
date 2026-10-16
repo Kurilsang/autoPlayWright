@@ -1,0 +1,22 @@
+# 工作流：AI 编码并发场景一——2 个 AI 生成任务同时发布，校验 UI 不串台、不卡死。
+# 逐标签核对（生成中态→各自完成→身份回显）在页面对象内完成，异常即 EvidenceError 冻结取证。
+# 并发规模 2：后端 LLM 限流（3~5 并发即限流），控制规模防偶发失败污染结论。
+meta:
+  id: workflow-ai-concurrent-publish
+  name: 工作流：并发发布 2 个 AI 生成任务 UI 校验
+  platforms: [web]
+  envs: [test]
+  tags: [P2, workflow, ai-coding, concurrency]
+  owner: qa
+steps:
+  - do:
+      page: aml_workflow
+      action: publish_ai_tasks_concurrently
+      args:
+        names: ["apw-ui-test-conc-pub-a", "apw-ui-test-conc-pub-b"]
+        prompt: "写一个最简工作流：打印 hello"
+        timeout_ms: 240000
+  - assert: { type: visible, page: aml_workflow, target: gen_done_marker }
+  - assert: { type: visible, page: aml_workflow, target: saved_badge }
+  - do: { page: aml_workflow, action: capture_context, args: {} }
+  - judge: { note: "v1 预留：并发生成脚本质量由 LLM-as-Judge 判定" }

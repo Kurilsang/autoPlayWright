@@ -1,0 +1,136 @@
+# 专家套组广场（套组新建/预览）。由 suite_probe{,2,3,4} 探查产物（2026-09-29）生成，人工审核入库。
+# 产品事实：模式选择卡「⚡ 简易模式 / 🔬 进阶模式」共用同一表单壳（基本信息/智能体配置/发布设置）；
+# 可见范围 radio name=scope（private=🔒私人空间 默认选中 / public=🌐公共套组广场——用例绝不允许选 public）；
+# 卡片单击=预览、双击=套用（用例绝不双击）；我的套组页尾有虚线「新建套组」卡（第二个新建入口）。
+page: suite_plaza
+locators:
+  # ---- 入口与页签（胶囊式页签带计数徽标）----
+  - name: nav_suite_plaza
+    source: ai
+    candidates:
+      - { by: text, value: "专家套组广场", exact: true }          # 侧边栏入口
+  - name: tab_plaza
+    source: ai
+    candidates:
+      - { by: css, value: "button:has-text('套组广场')" }
+  - name: tab_mine
+    source: ai
+    candidates:
+      - { by: css, value: "button:has-text('我的套组')" }
+  - name: tab_mine_count
+    source: manual
+    candidates:
+      - { by: css, value: "button:has-text('我的套组') span.rounded-full" }
+  # ---- 两个新建入口（header=广场右上角；虚线卡=我的套组页尾）----
+  - name: create_entry_plaza
+    source: manual
+    candidates:
+      - { by: css, value: "header button:has-text('新建套组')" }
+  - name: create_entry_mine
+    source: manual
+    candidates:
+      - { by: css, value: "main div.border-2.border-dashed:has-text('新建套组')" }
+  # ---- 模式选择卡（2x2 的模式维）----
+  - name: mode_simple
+    source: manual
+    candidates:
+      - { by: css, value: "button:has-text('简易模式')" }         # 用户口径「普通模式」
+  - name: mode_advanced
+    source: manual
+    candidates:
+      - { by: css, value: "button:has-text('进阶模式')" }
+  # ---- 新建表单（两种模式共用壳体）----
+  - name: suite_form_title
+    source: manual
+    candidates:
+      - { by: text, value: "新建专家套组", exact: true }          # 表单在场标记
+  - name: suite_name_input
+    source: ai
+    candidates:
+      - { by: placeholder, value: "例：Jira 问题分析" }
+  - name: suite_en_name_input
+    source: manual
+    candidates:
+      # 英文名/英文描述为静默必填（缺则提交 no-op 且无校验提示，2026-09-29 实测）
+      - { by: css, value: "input[placeholder^='e.g.']" }
+  - name: suite_desc_input
+    source: ai
+    candidates:
+      - { by: placeholder, value: "简短描述此套组的用途…" }
+  - name: suite_en_desc_input
+    source: manual
+    candidates:
+      - { by: css, value: "textarea[placeholder^='Briefly']" }
+  - name: tab_basic
+    source: manual
+    candidates:
+      - { by: text, value: "基本信息", exact: true }              # 提交前切回（实测可过）
+  - name: summary_mode_simple
+    source: manual
+    candidates:
+      - { by: text, value: "简易模式", exact: true }              # 摘要模式徽标（模式核对）
+  - name: summary_mode_advanced
+    source: manual
+    candidates:
+      - { by: text, value: "进阶模式", exact: true }
+  - name: tab_publish
+    source: manual
+    candidates:
+      - { by: text, value: "发布设置", exact: true }              # 可见范围所在分区
+  - name: scope_private_radio
+    source: manual
+    candidates:
+      - { by: css, value: "input[name='scope'][value='private']" }   # 🔒 私人空间（唯一允许）
+  - name: scope_public_radio
+    source: manual
+    candidates:
+      - { by: css, value: "input[name='scope'][value='public']" }    # 🌐 公共套组广场（禁点）
+  - name: summary_private_badge
+    source: manual
+    candidates:
+      - { by: text, value: "🔒 私有", exact: true }               # 左侧摘要可见性徽标
+  - name: submit_create
+    source: ai
+    candidates:
+      - { by: text, value: "创建套组", exact: true }
+  - name: form_cancel
+    source: ai
+    candidates:
+      - { by: text, value: "取消", exact: true }
+  # ---- 套组卡片与预览详情（单击=预览，绝不双击=套用）----
+  - name: suite_card
+    source: manual
+    candidates:
+      - { by: css, value: "main div.relative.group.flex.flex-col" }   # 卡片壳（filter 名称定位）
+  - name: suite_card_face
+    source: manual
+    candidates:
+      - { by: css, value: "div[title='单击预览，双击套用']" }      # 卡面（预览触发面）
+  - name: detail_panel_root
+    source: manual
+    candidates:
+      # 预览模态壳（fixed inset-0 z-[9999]，头部 h2 名称 + 滚动体描述 + 底部动作）
+      - { by: css, value: "div.fixed.inset-0:has(button:has-text('应用此套组'))" }
+  - name: detail_title
+    source: manual
+    candidates:
+      # 模态头部名称（名称回显锚点；网格卡片同名文本不与之争位）
+      - { by: css, value: "div.fixed.inset-0 h2.text-white.font-bold" }
+  - name: detail_agent_config
+    source: manual
+    candidates:
+      - { by: text, value: "Agent 配置", exact: true }            # 仅已配 Agent 的套组才有（观察证据）
+  - name: detail_apply_button
+    source: manual
+    candidates:
+      - { by: text, value: "✦ 应用此套组", exact: true }          # 详情动作（用例只看不点）
+  - name: detail_task_button
+    source: manual
+    candidates:
+      # 仅公开套组面板有此动作（观察证据）
+      - { by: css, value: "button:has-text('发起长任务')" }
+  - name: detail_close_button
+    source: manual
+    candidates:
+      # 模态右上 X 图标按钮（Esc 亦可关闭，用例走显式按钮）
+      - { by: css, value: "div.fixed.inset-0 button:has(path[d^='M6 18L18 6'])" }

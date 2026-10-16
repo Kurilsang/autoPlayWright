@@ -1,0 +1,33 @@
+# 套组广场第 5 轮探查（生成侧资产）：复现「创建套组」提交后的表单校验态
+# （用例实测提交未生效——找必填/校验提示）。不真正创建成功也无妨，仅看校验反馈。
+# 产物落 .scratch/autoPlayWright/snapshots/<env>/（gitignored，落盘自动脱敏）。
+name: suite-probe5
+targets:
+  - id: suite-submit
+    route: /
+    steps:
+      - do: { page: aml_chat, action: select_agent_mode, args: { mode: "专家模式", timeout_ms: 3000 } }
+        label: load_popups_dismissed
+      - do: { page: aml_chat, action: dismiss_onboarding, args: {} }
+        label: popups_dismissed
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "专家套组广场", exact: true }, optional: true, timeout_ms: 5000 } }
+        label: nav_suite_plaza
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "header button:has-text('新建套组')" }, optional: true, timeout_ms: 5000 } }
+        label: open_mode_chooser
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "简易模式", exact: true }, optional: true, timeout_ms: 4000 } }
+        label: open_simple_form
+      # 复刻用例填法：名称/描述逐键输入（React 受控输入）
+      - do: { page: probe, action: type, args: { selector: { by: placeholder, value: "例：Jira 问题分析" }, text: "apw探查套组 甲甲甲 999" } }
+        label: type_name
+      - do: { page: probe, action: type, args: { selector: { by: placeholder, value: "简短描述此套组的用途…" }, text: "apw 探查用描述 甲甲甲 999" } }
+        label: type_desc
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "发布设置", exact: true }, optional: true, timeout_ms: 4000 } }
+        label: open_publish
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "创建套组", exact: true }, optional: true, timeout_ms: 4000 } }
+        label: submit_create
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "suite_after_submit" } }
+        label: dom_after_submit
+    signals:
+      - name: history_loading
+        selector: { by: text, value: 加载对话历史中, exact: false }

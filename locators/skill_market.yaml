@@ -1,0 +1,94 @@
+# Skills 广场（skill 下载/上传）。由 skill_probe{,2,3} 探查产物（2026-09-29）生成，人工审核入库。
+# 真实应用无 data-testid；候选按稳定文本/属性 → css 兜底书写。
+# 产品事实：「Skill 套组」是默认页签（广场列表）；官方/社区是徽标图例非筛选控件；
+# 可见性 radio name=scope（private=🔒私人 默认选中 / public=🌐公共——用例绝不允许选 public）。
+page: skill_market
+locators:
+  # ---- 入口与页签（页签带计数徽标，text 精确匹配会失配，用 css has-text）----
+  - name: nav_skill_plaza
+    source: ai
+    candidates:
+      - { by: text, value: "Skills 广场", exact: true }          # 侧边栏入口
+  - name: tab_suites
+    source: ai
+    candidates:
+      - { by: css, value: "button.border-b-2:has-text('Skill 套组')" }
+  - name: tab_mine
+    source: ai
+    candidates:
+      - { by: css, value: "button.border-b-2:has-text('我的')" }
+  - name: tab_mine_count
+    source: manual
+    candidates:
+      - { by: css, value: "button.border-b-2:has-text('我的') span.rounded-full" }   # 计数徽标（下载回显信号之一）
+  # ---- 排序标签（激活态 bg-white shadow；官方/社区是图例不可点）----
+  - name: sort_bar
+    source: manual
+    candidates:
+      - { by: css, value: "div.inline-flex.rounded-md" }        # 排序 chips 容器
+  - name: sort_chip_active
+    source: manual
+    candidates:
+      - { by: css, value: "div.inline-flex.rounded-md > button.bg-white" }   # 当前激活排序
+  - name: search_input
+    source: ai
+    candidates:
+      - { by: placeholder, value: "搜索 Skills…" }
+  # ---- skill 卡片（filter(has_text=名称) 定位到具体卡；套组/我的共用卡壳）----
+  - name: skill_card
+    source: ai
+    candidates:
+      - { by: css, value: "div.group.rounded-2xl" }
+  - name: card_grid
+    source: manual
+    candidates:
+      - { by: css, value: "div.grid.grid-cols-1" }              # 卡片网格（结构断言用）
+  # ---- 上传表单（.zip 必须含 SKILL.md）----
+  - name: upload_entry
+    source: ai
+    candidates:
+      - { by: text, value: "上传 Skill", exact: true }
+  - name: upload_modal
+    source: manual
+    candidates:
+      - { by: css, value: "div.fixed.inset-0:has(input[name='scope'])" }
+  - name: upload_file_input
+    source: ai
+    candidates:
+      - { by: css, value: "input[type=file][accept='.zip']" }
+  - name: upload_name_input
+    source: manual
+    candidates:
+      # 占位符含产品名，前缀匹配只落「例：」不落敏感串
+      - { by: css, value: "input[placeholder^='例：']" }
+      - { by: css, value: "div.fixed.inset-0:has(input[name='scope']) input:not([type])" }
+  - name: upload_desc_input
+    source: ai
+    candidates:
+      - { by: placeholder, value: "简短描述这个 Skill 的用途…" }
+  - name: scope_private_radio
+    source: manual
+    candidates:
+      - { by: css, value: "input[name='scope'][value='private']" }   # 🔒 私人（唯一允许的可见性）
+  - name: scope_public_radio
+    source: manual
+    candidates:
+      - { by: css, value: "input[name='scope'][value='public']" }    # 🌐 公共（禁点：会污染公开库）
+  - name: upload_submit
+    source: ai
+    candidates:
+      - { by: text, value: "上传", exact: true }
+  - name: upload_cancel
+    source: ai
+    candidates:
+      - { by: text, value: "取消", exact: true }
+  # ---- 预览弹层（与上传弹层同壳，排除 scope 表单区分）----
+  - name: preview_modal
+    source: manual
+    candidates:
+      - { by: css, value: "div.fixed.inset-0.z-50:not(:has(input[name='scope']))" }
+  - name: preview_close_button
+    source: manual
+    candidates:
+      # 弹层头部 X 图标按钮（Esc 不关闭，是显式关闭键）
+      - { by: css, value: "div.fixed.inset-0.z-50 button:has(path[d^='M6 18L18 6'])" }

@@ -1,0 +1,55 @@
+# Skills 广场第 2 轮探查（生成侧资产）：上传表单结构 / 筛选标签 / 预览弹层 / 我的页签。
+# 只看结构不做副作用动作（不提交上传、不点下载）；「取消/关闭」把弹层收掉再进下一状态。
+# 产物落 .scratch/autoPlayWright/snapshots/<env>/（gitignored，落盘自动脱敏）。
+name: skill-probe2
+targets:
+  - id: skill-surfaces
+    route: /
+    steps:
+      - do: { page: aml_chat, action: select_agent_mode, args: { mode: "专家模式", timeout_ms: 3000 } }
+        label: load_popups_dismissed
+      - do: { page: aml_chat, action: dismiss_onboarding, args: {} }
+        label: popups_dismissed
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "Skills 广场", exact: true }, optional: true, timeout_ms: 5000 } }
+        label: nav_skill_plaza
+      # ---- 上传表单（只看结构，点取消不提交）----
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "上传 Skill", exact: true }, optional: true, timeout_ms: 5000 } }
+        label: open_upload_form
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "skill_upload_form" } }
+        label: dom_upload_form
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "取消", exact: true }, optional: true, timeout_ms: 3000 } }
+        label: close_upload_form
+      # ---- 筛选标签逐个切换（看结果集结构变化）----
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "官方", exact: true }, optional: true, timeout_ms: 3000 } }
+        label: filter_official
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "skill_filter_official" } }
+        label: dom_filter_official
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "社区", exact: true }, optional: true, timeout_ms: 3000 } }
+        label: filter_community
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "skill_filter_community" } }
+        label: dom_filter_community
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "最新", exact: true }, optional: true, timeout_ms: 3000 } }
+        label: sort_new
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "skill_sort_new" } }
+        label: dom_sort_new
+      # ---- 预览弹层（卡片上的「预览」，取首个）----
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "预览", exact: true }, optional: true, timeout_ms: 3000 } }
+        label: open_preview
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "skill_preview_modal" } }
+        label: dom_preview_modal
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "关闭", exact: true }, optional: true, timeout_ms: 3000 } }
+        label: close_preview
+      # ---- 我的页签（回显核对的目标区域）----
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "我的", exact: true }, optional: true, timeout_ms: 3000 } }
+        label: open_my_tab
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "skill_my_list" } }
+        label: dom_my_list
+    signals:
+      - name: history_loading
+        selector: { by: text, value: 加载对话历史中, exact: false }

@@ -1,0 +1,17 @@
+page: agent_chat
+locators:
+  - name: new_chat_button
+    candidates:
+      - { by: testid, value: new-chat }
+  - name: chat_input
+    candidates:
+      - { by: testid, value: chat-input }
+  - name: send_button
+    candidates:
+      - { by: testid, value: chat-send }
+  - name: message_list
+    candidates:
+      - { by: testid, value: chat-messages }
+  - name: streaming_indicator
+    candidates:
+      - { by: testid, value: chat-streaming }

@@ -1,0 +1,29 @@
+# Skills 广场第 3 轮探查（生成侧资产）：拿「Skill 套组」页签与「我的」列表的干净结构
+# （第 2 轮预览弹层未关掉，我的列表 dump 被污染）。
+# 产物落 .scratch/autoPlayWright/snapshots/<env>/（gitignored，落盘自动脱敏）。
+name: skill-probe3
+targets:
+  - id: skill-tabs
+    route: /
+    steps:
+      - do: { page: aml_chat, action: select_agent_mode, args: { mode: "专家模式", timeout_ms: 3000 } }
+        label: load_popups_dismissed
+      - do: { page: aml_chat, action: dismiss_onboarding, args: {} }
+        label: popups_dismissed
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "Skills 广场", exact: true }, optional: true, timeout_ms: 5000 } }
+        label: nav_skill_plaza
+      # ---- 我的页签（干净状态，无弹层；页签带计数徽标，用 css has-text 定位）----
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "button.border-b-2:has-text('我的')" }, optional: true, timeout_ms: 3000 } }
+        label: open_my_tab
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "skill_my_clean" } }
+        label: dom_my_clean
+      # ---- Skill 套组页签 ----
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "button.border-b-2:has-text('Skill 套组')" }, optional: true, timeout_ms: 3000 } }
+        label: open_suites_tab
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "skill_suites" } }
+        label: dom_suites
+    signals:
+      - name: history_loading
+        selector: { by: text, value: 加载对话历史中, exact: false }

@@ -1,0 +1,34 @@
+# 操练场首轮探查配置（生成侧资产）：新面探查（banner 计划表「待建」）。
+# 链路目标：创建套组 → 操练场 → 选用刚创建的套组 → 简单对话调试。
+# 本轮找：操练场入口（更多场景画廊「创作与调试」组）、智能体/套组选择器、提示词输入与输出区结构。
+# 探查期用 probe 保留名通用原语推进状态；页面对象产品化后 probe 步骤替换为 page: playground 动作。
+# 产物落 .scratch/autoPlayWright/snapshots/<env>/（gitignored，落盘自动脱敏）。
+name: playground-probe
+targets:
+  - id: playground-home
+    route: /
+    steps:
+      - do: { page: aml_chat, action: select_agent_mode, args: { mode: "专家模式", timeout_ms: 3000 } }
+        label: load_popups_dismissed
+      - do: { page: aml_chat, action: dismiss_onboarding, args: {} }
+        label: popups_dismissed
+        capture: true
+      # ---- 入口：侧边栏「更多场景」→ 场景卡「操练场」----
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "更多场景", exact: true }, optional: true, timeout_ms: 5000 } }
+        label: open_more_scenes
+      - do: { page: probe, action: click, args: { selector: { by: css, value: "button:has(span:text-is('操练场'))" }, optional: true, timeout_ms: 5000 } }
+        label: nav_playground
+        capture: true
+      - do: { page: probe, action: wait, args: { ms: 1800 } }
+        label: settle_playground
+      - do: { page: probe, action: dump_dom, args: { name: "playground_home" } }
+        label: dom_playground_home
+      # ---- 智能体/套组选择器候选（未命中静默跳过）----
+      - do: { page: probe, action: click, args: { selector: { by: text, value: "选择智能体", exact: false }, optional: true, timeout_ms: 4000 } }
+        label: try_agent_picker
+        capture: true
+      - do: { page: probe, action: dump_dom, args: { name: "playground_picker" } }
+        label: dom_playground_picker
+    signals:
+      - name: history_loading
+        selector: { by: text, value: 加载对话历史中, exact: false }
